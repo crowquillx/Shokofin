@@ -550,6 +550,7 @@ export const LibraryMenu = globalThis.LibraryMenu;
  *   MovieSpecialsAsExtraFeaturettes: boolean;
  *   AddTrailers: boolean;
  *   AddCreditsAsThemeVideos: boolean;
+ *   SeasonPosters_Enabled: boolean;
  *   AddCreditsAsSpecialFeatures: boolean;
  *   DefaultLibraryStructure: SeriesStructureType;
  *   DefaultSeasonOrdering: SeasonOrderType;

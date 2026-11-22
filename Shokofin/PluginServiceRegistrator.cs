@@ -13,6 +13,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator {
         serviceCollection.AddSingleton<API.ShokoApiClient>();
         serviceCollection.AddSingleton<API.ShokoApiManager>();
         serviceCollection.AddSingleton<API.ShokoIdLookup>();
+        serviceCollection.AddSingleton<API.SeasonPostersLookup>();
         serviceCollection.AddSingleton<Configuration.MediaFolderConfigurationService>();
         serviceCollection.AddSingleton<Configuration.SeriesConfigurationService>();
         serviceCollection.AddSingleton<Sync.UserDataSyncManager>();

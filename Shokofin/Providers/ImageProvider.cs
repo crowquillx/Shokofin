@@ -18,7 +18,7 @@ using Shokofin.Web;
 
 namespace Shokofin.Providers;
 
-public class ImageProvider(IHttpClientFactory _httpClientFactory, ILogger<ImageProvider> _logger, ShokoApiManager _apiManager, ShokoIdLookup _lookup) : IRemoteImageProvider, IHasOrder {
+public class ImageProvider(IHttpClientFactory _httpClientFactory, ILogger<ImageProvider> _logger, ShokoApiManager _apiManager, ShokoIdLookup _lookup, SeasonPostersLookup _seasonPosters) : IRemoteImageProvider, IHasOrder {
     public string Name => Plugin.MetadataProviderName;
 
     public int Order => 0;
@@ -59,21 +59,25 @@ public class ImageProvider(IHttpClientFactory _httpClientFactory, ILogger<ImageP
                     }
 
                     var images = await ImageUtility.GetShowImages(showInfo, metadataLanguage, displayMode, cancellationToken);
+                    images = ImageUtility.WithOverridePoster(images, await _seasonPosters.GetShowPosterId(showInfo, cancellationToken), metadataLanguage, displayMode);
                     list.AddRange(images);
 
                     _logger.LogInformation("Getting {Count} images for series {SeriesName} (MainSeason={MainSeasonId},Language={MetadataLanguage})", list.Count, series.Name, seasonId, metadataLanguage);
                     break;
                 }
                 // The "Specials" season doesn't have any images of its own, so
-                // use the images of the first season of the show, if it has any.
+                // use the images of the first season of the show, if it has any,
+                // after the specials poster chosen with Season Posters, if any.
                 case Season { IndexNumber: 0 } season: {
                     if (
                         season.Series is { } series &&
                         _lookup.TryGetSeasonIdFor(series, out var mainSeasonId) &&
                         await _apiManager.GetShowInfoBySeasonId(mainSeasonId) is { } showInfo &&
                         showInfo.SeasonOrderDictionary.TryGetValue(1, out var firstSeasonInfo)
-                    )
-                        list.AddRange(await GetSeasonImages(season, firstSeasonInfo, metadataLanguage, displayMode, cancellationToken));
+                    ) {
+                        var images = await GetSeasonImages(season, firstSeasonInfo, metadataLanguage, displayMode, cancellationToken);
+                        list.AddRange(ImageUtility.WithOverridePoster(images, await _seasonPosters.GetSpecialsPosterId(showInfo, cancellationToken), metadataLanguage, displayMode));
+                    }
                     break;
                 }
                 case Season { IndexNumber: > 0 } season: {

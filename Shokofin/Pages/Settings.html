@@ -88,6 +88,8 @@ form:not(.advanced-mode) .advanced-only {
                                 <input is="emby-input" type="text" id="ServerVersion" label="Server Version" readonly value="Unknown Version" />
                                 <div class="fieldDescription">The version of Shoko we're connected to.</div>
                             </div>
+                            <!-- Fork: posters (restricted tags warning) -->
+                            <div id="ShokoUserWarning" class="fieldDescription" style="color: #ff9800; margin-bottom: 1.5em;" hidden></div>
                             <button is="emby-button" type="submit" name="reset-connection" class="raised block emby-button">
                                 <span>${Disconnect}</span>
                             </button>
@@ -720,6 +722,16 @@ form:not(.advanced-mode) .advanced-only {
                                 </div>
                             </div>
                             <div class="fieldDescription">Filter the images during an automatic image search for backdrops/banners/thumbnails to only allow the specified languages, in the specified order. If no languages are selected then no filtering will occur in the automatic image search.</div>
+                        </div>
+                        <!-- Fork: posters -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="SeasonPosters_Enabled" />
+                                <span>Use Season Posters show and specials posters</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                For shows built from Shoko groups, use the show poster and the specials season poster chosen with the <a href="https://github.com/crowquillx/shoko-season-posters" target="_blank" rel="noopener noreferrer">Season Posters</a> Shoko plugin. Without that plugin installed in Shoko this does nothing. Shokofin reads its list at most every 10 minutes, and a new poster shows once the item's images are refreshed.
+                            </div>
                         </div>
                         <hr class="debug-only" />
                         <div class="checkboxContainer checkboxContainer-withDescription debug-only">
