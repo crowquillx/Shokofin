@@ -77,6 +77,18 @@ jobs:
       - name: Run JPRM
         run: python build_plugin.py --repo ${{ github.repository }} --version=${{ needs.current_info.outputs.version }} --tag=${{ needs.current_info.outputs.tag }}
 
+      - name: Smoke Test Jellyfin Startup
+        run: |
+          for zip in ./artifacts/shoko_*.zip; do
+            case "$zip" in
+              *_for_10.10.z.zip) tag=10.10.7 ;;
+              *_for_10.11.z.zip) tag=10.11.11 ;;
+              *_for_12.y.z.zip) tag=12 ;;
+              *) echo "::error::No Jellyfin image to smoke test $zip with"; exit 1 ;;
+            esac
+            bash .github/scripts/smoke-test.sh "$zip" "$tag"
+          done
+
       - name: Change to Metadata Branch
         run: |
           mkdir stable;
