@@ -584,6 +584,8 @@ function applyFormToConfig(form, config) {
         case "metadata": {
             config.MarkSpecialsWhenGrouped = form.querySelector("#MarkSpecialsWhenGrouped").checked;
             config.AlwaysUseEpisodeTitleForTmdbMovies = form.querySelector("#AlwaysUseEpisodeTitleForTmdbMovies").checked;
+            // Fork: titles
+            config.ShortenSeasonTitles = form.querySelector("#ShortenSeasonTitles").checked;
             applyTitleFormToConfig(form, config);
 
             config.DescriptionConversionMode = form.querySelector("#DescriptionConversionMode").value;
@@ -863,6 +865,8 @@ async function applyConfigToForm(form, config) {
             form.querySelector("#Title_ConfigureFor_Enabled").disabled = config.Title[State.metadata.title].Enabled === undefined;
             form.querySelector("#MarkSpecialsWhenGrouped").checked = config.MarkSpecialsWhenGrouped;
             form.querySelector("#AlwaysUseEpisodeTitleForTmdbMovies").checked = config.AlwaysUseEpisodeTitleForTmdbMovies;
+            // Fork: titles
+            form.querySelector("#ShortenSeasonTitles").checked = config.ShortenSeasonTitles;
             form.querySelector("#RemoveDuplicateTitles").checked = config.Title[State.metadata.title].RemoveDuplicates;
             renderSortableCheckboxList(form, "TitleMainList", config.Title[State.metadata.title].MainTitle.List, config.Title[State.metadata.title].MainTitle.Order);
             form.querySelector("#TitleMainAllowAny").checked = config.Title[State.metadata.title].MainTitle.AllowAny;

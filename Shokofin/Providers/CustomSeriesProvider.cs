@@ -248,7 +248,7 @@ public class CustomSeriesProvider(ILogger<CustomSeriesProvider> _logger, Virtual
             if (seasons.ContainsKey(seasonNumber))
                 continue;
             var offset = seasonNumber - showInfo.GetBaseSeasonNumberForSeasonInfo(seasonInfo);
-            var season = CustomSeasonProvider.AddVirtualSeason(_libraryManager, _logger, seasonInfo, offset, seasonNumber, series);
+            var season = CustomSeasonProvider.AddVirtualSeason(_libraryManager, _logger, seasonInfo, offset, seasonNumber, series, showInfo);
             if (season == null)
                 continue;
             yield return (seasonNumber, season);

@@ -68,7 +68,7 @@ public class SeasonProvider(IHttpClientFactory _httpClientFactory, ILogger<Seaso
 
             var offset = Math.Abs(seasonNumber - baseSeasonNumber);
 
-            result.Item = CreateMetadata(seasonInfo, seasonNumber, offset, info.MetadataLanguage, info.MetadataCountryCode);
+            result.Item = CreateMetadata(seasonInfo, seasonNumber, offset, info.MetadataLanguage, info.MetadataCountryCode, showInfo);
             result.HasMetadata = true;
             result.ResetPeople();
             foreach (var person in seasonInfo.Staff)
@@ -85,14 +85,14 @@ public class SeasonProvider(IHttpClientFactory _httpClientFactory, ILogger<Seaso
         }
     }
 
-    public static Season CreateMetadata(Info.SeasonInfo seasonInfo, int seasonNumber, int offset, string metadataLanguage, string metadataCountryCode)
-        => CreateMetadata(seasonInfo, seasonNumber, offset, metadataLanguage, metadataCountryCode, null, Guid.Empty);
+    public static Season CreateMetadata(Info.SeasonInfo seasonInfo, int seasonNumber, int offset, string metadataLanguage, string metadataCountryCode, Info.ShowInfo? showInfo = null)
+        => CreateMetadata(seasonInfo, seasonNumber, offset, metadataLanguage, metadataCountryCode, null, Guid.Empty, showInfo);
 
-    public static Season CreateMetadata(Info.SeasonInfo seasonInfo, int seasonNumber, int offset, Series series, Guid seasonId)
-        => CreateMetadata(seasonInfo, seasonNumber, offset, series.GetPreferredMetadataLanguage(), series.GetPreferredMetadataCountryCode(), series, seasonId);
+    public static Season CreateMetadata(Info.SeasonInfo seasonInfo, int seasonNumber, int offset, Series series, Guid seasonId, Info.ShowInfo? showInfo = null)
+        => CreateMetadata(seasonInfo, seasonNumber, offset, series.GetPreferredMetadataLanguage(), series.GetPreferredMetadataCountryCode(), series, seasonId, showInfo);
 
-    private static Season CreateMetadata(Info.SeasonInfo seasonInfo, int seasonNumber, int offset, string metadataLanguage, string metadataCountryCode, Series? series, Guid seasonId) {
-        var (displayTitle, alternateTitle) = TextUtility.GetSeasonTitles(seasonInfo, offset, metadataLanguage);
+    private static Season CreateMetadata(Info.SeasonInfo seasonInfo, int seasonNumber, int offset, string metadataLanguage, string metadataCountryCode, Series? series, Guid seasonId, Info.ShowInfo? showInfo) {
+        var (displayTitle, alternateTitle) = TextUtility.GetSeasonTitles(seasonInfo, offset, metadataLanguage, showInfo);
         if (string.IsNullOrEmpty(displayTitle))
             displayTitle = $"Season {seasonNumber}";
 

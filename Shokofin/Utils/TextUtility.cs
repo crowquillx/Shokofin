@@ -508,7 +508,7 @@ public static partial class TextUtility {
 
     #region Titles | Season
 
-    public static (string? displayTitle, string? alternateTitle) GetSeasonTitles(SeasonInfo seasonInfo, int baseSeasonOffset, string? metadataLanguage) {
+    public static (string? displayTitle, string? alternateTitle) GetSeasonTitles(SeasonInfo seasonInfo, int baseSeasonOffset, string? metadataLanguage, ShowInfo? showInfo = null) {
         var config = seasonInfo.StructureType switch {
             SeriesStructureType.AniDB_Anime => Plugin.Instance.Configuration.Title.AnidbSeason.Enabled
                 ? Plugin.Instance.Configuration.Title.AnidbSeason
@@ -522,6 +522,8 @@ public static partial class TextUtility {
         };
         var displayTitle = GetSeriesTitleByType(seasonInfo, config.MainTitle, metadataLanguage);
         var alternateTitle = JoinTitles(config.AlternateTitles.Select(t => GetSeriesTitleByType(seasonInfo, t, metadataLanguage)), displayTitle, config.RemoveDuplicates);
+        if (Plugin.Instance.Configuration.ShortenSeasonTitles && showInfo is not null && !string.IsNullOrEmpty(displayTitle))
+            displayTitle = GetShortenedSeasonTitle(seasonInfo, displayTitle, config.MainTitle, metadataLanguage, showInfo);
         if (baseSeasonOffset > 0) {
             string type = string.Empty;
             switch (baseSeasonOffset) {
@@ -540,6 +542,38 @@ public static partial class TextUtility {
         }
 
         return (displayTitle, alternateTitle);
+    }
+
+    // Fork: titles
+    private static string GetShortenedSeasonTitle(SeasonInfo seasonInfo, string displayTitle, TitleConfiguration configuration, string? metadataLanguage, ShowInfo showInfo) {
+        if (seasonInfo.StructureType is SeriesStructureType.TMDB_SeriesAndMovies)
+            return displayTitle;
+
+        var seasonList = showInfo.SeasonOrderDictionary
+            .OrderBy(pair => pair.Key)
+            .Select(pair => pair.Value)
+            .DistinctBy(season => season.Id)
+            .ToList();
+        var index = seasonList.FindIndex(season => season.Id == seasonInfo.Id);
+        if (seasonList.Count < 2 || index < 0)
+            return displayTitle;
+
+        var showTitle = GetShowTitles(showInfo, metadataLanguage).displayTitle;
+        if (string.IsNullOrWhiteSpace(showTitle))
+            showTitle = showInfo.Title;
+        if (string.IsNullOrWhiteSpace(showTitle))
+            return displayTitle;
+
+        var seasons = seasonList
+            .Select(season => new SeasonTitleUtility.Season(
+                season.Id,
+                season.Id == seasonInfo.Id ? displayTitle : GetSeriesTitleByType(season, configuration, metadataLanguage) ?? season.Title,
+                season.Titles.FirstOrDefault(title => title.Source is "AniDB" && title.Type is TitleType.Main)?.Value,
+                season.PremiereDate
+            ))
+            .ToList();
+        var titles = SeasonTitleUtility.ShortenSeasonTitles(showTitle, showInfo.DefaultSeason.Id, seasons);
+        return titles[index] is { Length: > 0 } title ? title : displayTitle;
     }
 
     #endregion
