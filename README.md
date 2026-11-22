@@ -1,4 +1,72 @@
-# Shokofin
+# Shokofin (personal fork)
+
+> [!WARNING]
+> **This is a personal fork of [ShokoAnime/Shokofin](https://github.com/ShokoAnime/Shokofin).**
+> It may not be maintained, may fall behind upstream, and its extra features are
+> not well-tested. For the supported plugin, use the official repository. Please
+> do not report problems with this fork to the Shokofin developers.
+
+## Installing this fork
+
+Add this repository in Jellyfin under **Dashboard → Plugins → Repositories**,
+and remove the official Shokofin repository first. Both use the same plugin ID,
+so with both added Jellyfin installs whichever offers the higher version.
+
+- Dev builds: `https://raw.githubusercontent.com/crowquillx/Shokofin/metadata/dev/manifest.json`
+
+Fork builds are versioned `6.1.x` and up, so they replace an installed official
+`6.0.x` build and keep its settings.
+
+## What this fork adds
+
+Ported from [silo-shoko-plugin](https://github.com/crowquillx/silo-shoko-plugin).
+None of these have been run against a real Jellyfin and Shoko setup yet.
+
+- **Intro and credits markers from TheIntroDB (Shoko numbering).** A
+  "TheIntroDB (Shoko)" media segment provider looks each episode up by the TMDB
+  episode Shoko links it to, so grouped or reordered seasons still get the
+  right intro, recap, credits and preview segments. Off by default: turn it on
+  under Metadata settings, optionally add a TheIntroDB API key for a bigger
+  daily lookup budget, and enable the provider in your library settings.
+- **More Shoko events.** Files re-added to Shoko, removed releases, and files
+  marked ignored or as variations now update the library right away. On daily
+  Shoko, changed artwork refreshes images, and group changes, moved series,
+  provider link changes, hidden episodes and custom tag changes relink the
+  affected files and refresh their shows.
+- **Catch-up after reconnecting.** Shoko doesn't resend events missed while
+  disconnected, so when the connection comes back Shokofin scans the libraries
+  with SignalR events enabled once, at most every 10 minutes. An optional
+  periodic catch-up interval is under SignalR → Basic Settings (off by default).
+- **Better episode titles.** Episodes AniDB hasn't named yet (`TBA`,
+  `Episode 12.5`, and daily Shoko's made-up names like `第12話`) use the next
+  title source you've configured, such as TMDB, instead of the placeholder.
+- **Shorten season titles (optional).** In shows with several seasons, drops
+  the show's name from the front of season titles, so "Demon Slayer:
+  Entertainment District Arc" becomes "Entertainment District Arc". Seasons
+  keep their full name when too little would be left. Turn it on under
+  Metadata → Title Settings, then refresh metadata.
+- **Theme songs survive VFS rebuilds.** A `theme.mp3` (or theme folder) that a
+  theme song plugin puts in a VFS show or season folder is no longer deleted on
+  the next scan, and moves with its show when the show's folder is renamed. On
+  by default.
+- **Theme songs shared with media folders (optional).** Theme songs in your
+  media folders show up in the VFS, and ones downloaded into the VFS are copied
+  into the media folder. Only folders that hold a single show or season are
+  used, and nothing there is ever overwritten or deleted.
+- **Hide covered variations (optional).** Files Shoko marks as a variation are
+  left out when another file already covers the episode. A variation that is
+  an episode's only file, such as one part of a split episode, is kept.
+- **Season Posters show and specials posters.** With the
+  [Season Posters](https://github.com/crowquillx/shoko-season-posters) Shoko
+  plugin installed, shows built from Shoko groups use the show and specials
+  posters it chose instead of repeating the main season's poster. On by default
+  under Image Settings; does nothing without that plugin.
+- **Restricted-tag warning.** If the Shoko user Shokofin connects as has
+  restricted tags, the connection tab and the log warn that every series with
+  one of those tags will be missing from Jellyfin.
+
+---
+
 
 A Jellyfin plugin to integrate [Jellyfin](https://jellyfin.org/) with
 [Shoko Server](https://shokoanime.com/downloads/shoko-server).

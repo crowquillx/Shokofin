@@ -111,6 +111,9 @@ public class ShokoApiClient : IDisposable {
                 if (hasSuggestionsExposed != HasSuggestionsExposed) {
                     HasSuggestionsExposed = hasSuggestionsExposed;
                 }
+
+                // Fork: warn about restricted tags once the connection is usable.
+                _ = Task.Run(() => WarnIfUserHasRestrictedTags());
             }
         }
     }
@@ -401,6 +404,54 @@ public class ShokoApiClient : IDisposable {
 
     public Task<HttpResponseMessage> GetImageAsync(Guid imageId)
         => Get($"/api/v3/Image/{imageId}", HttpMethod.Get, null, true);
+
+    #endregion
+
+    #region Fork: Season Posters & User
+
+    /// <summary>
+    /// Get the show poster list of the Season Posters Shoko plugin. Returns
+    /// <c>null</c> when the plugin is not installed (the route answers 404).
+    /// </summary>
+    public async Task<SeasonPostersShowList?> GetSeasonPostersShowList(CancellationToken cancellationToken = default) {
+        var response = await Get("/api/plugin/season-posters/show-posters", HttpMethod.Get, cancellationToken: cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NotFound)
+            return null;
+        if (response.StatusCode is not HttpStatusCode.OK)
+            throw ApiException.FromResponse(response);
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        return await JsonSerializer.DeserializeAsync<SeasonPostersShowList>(stream, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Build the warning shown when Shoko hides tags from the user the API key
+    /// belongs to, since every group and series with one of those tags is then
+    /// missing from Jellyfin. Returns <c>null</c> when nothing is hidden.
+    /// </summary>
+    public static string? GetRestrictedTagsWarning(ShokoUser user)
+        => user.RestrictedTags.Count > 0
+            ? $"Shoko hides {user.RestrictedTags.Count} tag{(user.RestrictedTags.Count == 1 ? "" : "s")} from the Shoko user \"{user.Username}\", so every series with one of them is missing from Jellyfin. Connect with a Shoko user without restricted tags to include them."
+            : null;
+
+    /// <summary>
+    /// Log a warning when the Shoko user the API key belongs to has
+    /// restricted tags.
+    /// </summary>
+    public async Task WarnIfUserHasRestrictedTags(CancellationToken cancellationToken = default) {
+        try {
+            if (await GetCurrentUser(cancellationToken) is { } user && GetRestrictedTagsWarning(user) is { } warning)
+                _logger.LogWarning("{Warning} (User={UserId})", warning, user.ID);
+        }
+        catch (Exception ex) {
+            _logger.LogDebug(ex, "Unable to check the Shoko user for restricted tags. {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Get the Shoko user the configured API key belongs to.
+    /// </summary>
+    public Task<ShokoUser?> GetCurrentUser(CancellationToken cancellationToken = default)
+        => GetOrNull<ShokoUser>("/api/v3/User/Current", skipCache: true, cancellationToken: cancellationToken);
 
     #endregion
 

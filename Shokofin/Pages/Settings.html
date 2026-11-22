@@ -88,6 +88,8 @@ form:not(.advanced-mode) .advanced-only {
                                 <input is="emby-input" type="text" id="ServerVersion" label="Server Version" readonly value="Unknown Version" />
                                 <div class="fieldDescription">The version of Shoko we're connected to.</div>
                             </div>
+                            <!-- Fork: posters (restricted tags warning) -->
+                            <div id="ShokoUserWarning" class="fieldDescription" style="color: #ff9800; margin-bottom: 1.5em;" hidden></div>
                             <button is="emby-button" type="submit" name="reset-connection" class="raised block emby-button">
                                 <span>${Disconnect}</span>
                             </button>
@@ -112,6 +114,15 @@ form:not(.advanced-mode) .advanced-only {
                             </label>
                             <div class="fieldDescription checkboxFieldDescription">When enabled, entries with a linked TheMovieDb movie use the episode title as-is instead of composing the title as &quot;Series: Episode&quot;. The title settings may need to be tweaked accordingly for this to function properly; you can configure the Shoko group &quot;Movie / Film&quot; title settings when advanced mode is enabled.</div>
                         </div>
+                        <!-- Fork: titles -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="ShortenSeasonTitles" />
+                                <span>Shorten Season Titles</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">In shows with several seasons, drops the show's title from the front of each season's title, so &quot;Demon Slayer: Entertainment District Arc&quot; becomes &quot;Entertainment District Arc&quot;. A season keeps its full title when only a year, a number or a few characters would be left, and every season keeps its full title when fewer than half of them start with the show's title. Seasons with the same title are told apart using their AniDB main title. Does not apply to the TheMovieDb structure. Refresh the library's metadata after changing this.</div>
+                        </div>
+                        <!-- Fork: titles (end) -->
                         <hr class="advanced-only" />
                         <div class="selectContainer selectContainer-withDescription advanced-only">
                             <label class="selectLabel" for="Title_ConfigureFor">Configure settings for</label>
@@ -720,6 +731,16 @@ form:not(.advanced-mode) .advanced-only {
                                 </div>
                             </div>
                             <div class="fieldDescription">Filter the images during an automatic image search for backdrops/banners/thumbnails to only allow the specified languages, in the specified order. If no languages are selected then no filtering will occur in the automatic image search.</div>
+                        </div>
+                        <!-- Fork: posters -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="SeasonPosters_Enabled" />
+                                <span>Use Season Posters show and specials posters</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                For shows built from Shoko groups, use the show poster and the specials season poster chosen with the <a href="https://github.com/crowquillx/shoko-season-posters" target="_blank" rel="noopener noreferrer">Season Posters</a> Shoko plugin. Without that plugin installed in Shoko this does nothing. Shokofin reads its list at most every 10 minutes, and a new poster shows once the item's images are refreshed.
+                            </div>
                         </div>
                         <hr class="debug-only" />
                         <div class="checkboxContainer checkboxContainer-withDescription debug-only">
@@ -1629,6 +1650,27 @@ form:not(.advanced-mode) .advanced-only {
                             <span>${Save}</span>
                         </button>
                     </fieldset>
+                    <!-- Fork: TheIntroDB -->
+                    <fieldset id="Metadata_IntroDB_Section" class="verticalSection verticalSection-extrabottompadding" hidden>
+                        <legend>
+                            <h3>Intro &amp; Credits Markers (TheIntroDB)</h3>
+                        </legend>
+                        <div class="fieldDescription verticalSection-extrabottompadding">Provides intro, recap, credits and preview segments from <a href="https://theintrodb.org" target="_blank" rel="noopener noreferrer">TheIntroDB</a>, looked up by the TMDB episode or movie Shoko links each item to, so the numbering of a Shoko series or group does not matter. Items without a TMDB link in Shoko get no segments. Nothing is ever submitted to TheIntroDB. After enabling it, make sure the "TheIntroDB (Shoko)" media segment provider is enabled in the library settings, and turn off any other provider that looks segments up by Jellyfin's season and episode numbers for Shoko libraries.</div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="IntroDB_Enabled" />
+                                <span>Get markers from TheIntroDB</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Look up media segments in TheIntroDB for episodes and movies managed by the plugin. Credits and previews are only used when TheIntroDB timed them on a release within 5 minutes of the file's length.</div>
+                        </div>
+                        <div class="inputContainer inputContainer-withDescription">
+                            <input is="emby-input" type="password" id="IntroDB_ApiKey" label="TheIntroDB API Key" autocomplete="off" />
+                            <div class="fieldDescription">Optional. Lookups work without an account, but TheIntroDB allows only a limited number of anonymous lookups a day. A key from your theintrodb.org account raises that budget.</div>
+                        </div>
+                        <button is="emby-button" type="submit" name="settings" class="raised button-submit block emby-button">
+                            <span>${Save}</span>
+                        </button>
+                    </fieldset>
                     <fieldset id="Library_Basic_Section" class="verticalSection verticalSection-extrabottompadding" hidden>
                         <legend>
                             <h3>Basic Settings</h3>
@@ -2223,6 +2265,29 @@ form:not(.advanced-mode) .advanced-only {
                             </label>
                             <div class="fieldDescription checkboxFieldDescription">Enabling this will add the standardized resolution (e.g. 480p, 1080p, 4K, etc.) to all files in the VFS if available. <strong>Warning</strong>: Though rare, we may fail to read the media info in Shoko when the files were first added (e.g. because of a corrupt file, encountering an unsupported <i>new</i> codec, etc.), then reading it later. This may lead to episode/movie entries to be "removed" and "added" as new entries the next time they are refreshed after the metadata has been added. <strong>Use at your own risk.</strong></div>
                         </div>
+                        <!-- Fork: VFS -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="VFS_PreserveThemeSongs" />
+                                <span>Keep Theme Songs Added to the VFS</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Keep theme songs that something other than the plugin puts in a VFS show or season folder, such as the <code>theme.mp3</code> a theme song plugin downloads, instead of removing them the next time the VFS is generated. Theme songs follow their show when its folder is renamed, and are removed with it when the show leaves the library.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="VFS_SyncThemeSongs" />
+                                <span>Share Theme Songs With Media Folders</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Link the theme songs in your media folders (<code>theme.mp3</code>, <code>theme2.mp3</code>, or audio in a <code>theme-music</code>, <code>theme-songs</code>, <code>themes</code>, <code>theme songs</code> or <code>theme music</code> folder) into the matching VFS show or season, and copy theme songs written into the VFS to the media folder so they survive a VFS rebuild. A media folder is only used when every file in it belongs to the same show or season, so shared download folders and media folder roots are left alone. Nothing in a media folder is ever overwritten or removed; a theme removed from the media folder is removed from the VFS once the media folder can be read again. Runs on full VFS generations, not iterative ones. <strong>Writes to your media folders.</strong></div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="VFS_SkipCoveredVariations" />
+                                <span>Leave Out Covered Variations</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Leave out files marked as a variation in Shoko for the episodes another file already covers, so only the main version is shown. A variation is kept when it is an episode's only file, such as the parts of an episode split across files.</div>
+                        </div>
+                        <!-- End fork: VFS -->
                         <button is="emby-button" type="submit" name="settings" class="raised button-submit block emby-button">
                             <span>${Save}</span>
                         </button>
@@ -2354,6 +2419,21 @@ form:not(.advanced-mode) .advanced-only {
                             </div>
                             <div class="fieldDescription">Which event sources should be listened to for metadata events.</div>
                         </div>
+                        <!-- Fork: events -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="SignalRCatchUpOnReconnect" />
+                                <span>Catch Up After Reconnecting</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Shoko does not resend the events it sent while the connection was down. When enabled, the libraries with file or refresh events enabled are scanned once after the connection comes back, at most every 10 minutes.
+                            </div>
+                        </div>
+                        <div class="inputContainer inputContainer-withDescription">
+                            <input is="emby-input" type="number" id="SignalRPeriodicCatchUpInterval" min="0" step="1" label="Periodic Catch-up Interval (hours)" />
+                            <div class="fieldDescription">Also scan those libraries on this interval while connected, to pick up changes Shoko sends no event for. Set to 0 to turn it off.</div>
+                        </div>
+                        <!-- End fork: events -->
                         <button is="emby-button" type="submit" name="settings" class="raised button-submit block emby-button">
                             <span>${Save}</span>
                         </button>

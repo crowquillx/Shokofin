@@ -235,6 +235,19 @@ public class PluginConfiguration : BasePluginConfiguration {
     /// </summary>
     public bool AlwaysUseEpisodeTitleForTmdbMovies { get; set; }
 
+    // Fork: titles
+
+    /// <summary>
+    /// Drop the show's title from the front of season titles in shows with
+    /// several seasons, e.g. "Demon Slayer: Entertainment District Arc"
+    /// becomes "Entertainment District Arc". Seasons keep their full name
+    /// when too little would be left, and every season keeps its full name
+    /// when fewer than half of them start with the show's title.
+    /// </summary>
+    public bool ShortenSeasonTitles { get; set; }
+
+    // Fork: titles (end)
+
     /// <summary>
     /// The new description configuration.
     /// </summary>
@@ -712,6 +725,34 @@ public class PluginConfiguration : BasePluginConfiguration {
     [Range(0, 100)]
     public int VFS_IterativeGenerationMaxCount { get; set; } = 0;
 
+    // Fork: VFS
+
+    /// <summary>
+    /// Keep theme songs that something other than the plugin put in a VFS show
+    /// or season folder, such as a theme song plugin's <c>theme.mp3</c>,
+    /// instead of removing them when the VFS is cleaned up.
+    /// </summary>
+    public bool VFS_PreserveThemeSongs { get; set; } = true;
+
+    /// <summary>
+    /// Share theme songs between the VFS and the media folders. Theme songs in
+    /// a media folder are linked into the matching VFS show or season folder,
+    /// and theme songs written into the VFS are copied to the media folder.
+    /// Only media folders where every file belongs to the same show (or
+    /// season) are used, and nothing in a media folder is ever overwritten or
+    /// removed. Implies <see cref="VFS_PreserveThemeSongs"/>.
+    /// </summary>
+    public bool VFS_SyncThemeSongs { get; set; } = false;
+
+    /// <summary>
+    /// Leave out files marked as a variation in Shoko for the episodes another
+    /// file that is not a variation already covers. A variation is kept when
+    /// it is the only file for one of its episodes.
+    /// </summary>
+    public bool VFS_SkipCoveredVariations { get; set; } = false;
+
+    // End fork: VFS
+
     #endregion
 
     #region Media Folder
@@ -771,6 +812,23 @@ public class PluginConfiguration : BasePluginConfiguration {
     /// The different SignalR event sources to 'subscribe' to.
     /// </summary>
     public ProviderName[] SignalR_EventSources { get; set; }
+
+    // Fork: events
+
+    /// <summary>
+    /// Scan the libraries with file or refresh events enabled after the
+    /// connection to Shoko is lost and comes back, since Shoko does not replay
+    /// the events sent while we were not listening.
+    /// </summary>
+    public bool SignalR_CatchUpOnReconnect { get; set; } = true;
+
+    /// <summary>
+    /// Also scan those libraries on this interval while connected, to pick up
+    /// changes Shoko sends no event for. 0 turns it off.
+    /// </summary>
+    public int SignalR_PeriodicCatchUpIntervalInHours { get; set; } = 0;
+
+    // End fork: events
 
     #endregion
 
@@ -835,6 +893,34 @@ public class PluginConfiguration : BasePluginConfiguration {
     /// </summary>
     [XmlElement("EXPERT_MODE")]
     public bool AdvancedMode { get; set; }
+
+    #endregion
+
+    #region Fork: TheIntroDB
+
+    // Fork: TheIntroDB
+    /// <summary>
+    /// Provide intro, recap, credits and preview segments from TheIntroDB,
+    /// looked up by the TMDB episode or movie Shoko links each item to.
+    /// </summary>
+    public bool IntroDB_Enabled { get; set; }
+
+    /// <summary>
+    /// Optional TheIntroDB API key, which raises the daily lookup budget.
+    /// </summary>
+    public string IntroDB_ApiKey { get; set; }
+
+    #endregion
+
+    // Fork: posters
+    #region Fork: Season Posters
+
+    /// <summary>
+    /// Use the show and specials posters chosen with the Season Posters Shoko
+    /// plugin for shows built from Shoko groups. Does nothing when that
+    /// plugin is not installed in Shoko.
+    /// </summary>
+    public bool SeasonPosters_Enabled { get; set; } = true;
 
     #endregion
 
@@ -941,5 +1027,8 @@ public class PluginConfiguration : BasePluginConfiguration {
         MetadataRefresh = new();
         Misc_ShowInMenu = false;
         AdvancedMode = false;
+        // Fork: TheIntroDB
+        IntroDB_Enabled = false;
+        IntroDB_ApiKey = string.Empty;
     }
 }

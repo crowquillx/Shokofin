@@ -36,7 +36,7 @@ promise.then(({
 //#region Constants
 
 /**
- * @typedef {"Connection" | "Metadata_Title" | "Metadata_Description" | "Metadata_TagGenre" | "Metadata_Image" | "Metadata_Misc" | "Library_Basic" | "Library_Collection" | "Library_Playlist" | "Library_MultipleVersions" | "Library_MediaFolder" | "Library_SeasonMerging" | "VFS_Basic" | "VFS_Location" | "User" | "Series" | "SignalR_Connection" | "SignalR_Basic" | "SignalR_Library_New" | "SignalR_Library_Existing" | "Misc" | "Debug" | "Utilities"} SectionType
+ * @typedef {"Connection" | "Metadata_Title" | "Metadata_Description" | "Metadata_TagGenre" | "Metadata_Image" | "Metadata_Misc" | "Metadata_IntroDB" | "Library_Basic" | "Library_Collection" | "Library_Playlist" | "Library_MultipleVersions" | "Library_MediaFolder" | "Library_SeasonMerging" | "VFS_Basic" | "VFS_Location" | "User" | "Series" | "SignalR_Connection" | "SignalR_Basic" | "SignalR_Library_New" | "SignalR_Library_Existing" | "Misc" | "Debug" | "Utilities"} SectionType
  */
 
 const MaxDebugPresses = 7;
@@ -51,6 +51,7 @@ const Sections = [
     "Metadata_TagGenre",
     "Metadata_Image",
     "Metadata_Misc",
+    "Metadata_IntroDB", // Fork: TheIntroDB
     "Library_Basic",
     "Library_Collection",
     "Library_Playlist",
@@ -454,6 +455,8 @@ async function updateView(view, form, config) {
                 form.querySelector("#ServerVersion").value = "Version N/A";
             }
 
+            updateShokoUserWarning(form, State.connected); // Fork: posters
+
             if (State.connected) {
                 form.querySelector("#Url").removeAttribute("required");
                 form.querySelector("#Username").removeAttribute("required");
@@ -477,6 +480,7 @@ async function updateView(view, form, config) {
 
         case "metadata":
             activeSections.push("Metadata_Title", "Metadata_Description", "Metadata_TagGenre", "Metadata_Image", "Metadata_Misc");
+            activeSections.push("Metadata_IntroDB"); // Fork: TheIntroDB
             if (form.querySelector("#Title_ConfigureFor").value !== State.metadata.title) {
                 form.querySelector("#Title_ConfigureFor").value = State.metadata.title;
             }
@@ -573,6 +577,43 @@ function updateSignalrStatus(form, status) {
 
 //#region Form → Configuration
 
+//#region Fork: posters (restricted tags warning)
+
+/**
+ * Show a warning on the connection tab when Shoko hides tags from the user the
+ * API key belongs to, since every series with one of those tags is then
+ * missing from Jellyfin.
+ *
+ * @param {HTMLFormElement} form - The form element.
+ * @param {boolean} connected - Whether the plugin is connected to Shoko.
+ */
+async function updateShokoUserWarning(form, connected) {
+    const element = form.querySelector("#ShokoUserWarning");
+    if (!element)
+        return;
+    element.setAttribute("hidden", "");
+    element.textContent = "";
+    if (!connected)
+        return;
+    try {
+        /** @type {{ Username: string; IsAdmin: boolean; RestrictedTagCount: number; Warning: string | null; }} */
+        const user = await ApiClient.fetch({
+            dataType: "json",
+            type: "GET",
+            url: ApiClient.getUrl("Shokofin/Host/User"),
+        });
+        if (user && user.Warning) {
+            element.textContent = user.Warning;
+            element.removeAttribute("hidden");
+        }
+    }
+    catch (err) {
+        console.debug("Shokofin: unable to check the Shoko user for restricted tags.", err);
+    }
+}
+
+//#endregion
+
 /**
  * Apply a form to a configuration object.
  *
@@ -584,6 +625,8 @@ function applyFormToConfig(form, config) {
         case "metadata": {
             config.MarkSpecialsWhenGrouped = form.querySelector("#MarkSpecialsWhenGrouped").checked;
             config.AlwaysUseEpisodeTitleForTmdbMovies = form.querySelector("#AlwaysUseEpisodeTitleForTmdbMovies").checked;
+            // Fork: titles
+            config.ShortenSeasonTitles = form.querySelector("#ShortenSeasonTitles").checked;
             applyTitleFormToConfig(form, config);
 
             config.DescriptionConversionMode = form.querySelector("#DescriptionConversionMode").value;
@@ -608,6 +651,7 @@ function applyFormToConfig(form, config) {
 
             config.Image.DebugMode = form.querySelector("#Image_DebugMode").checked;
             applyImageFormToConfig(form, config);
+            config.SeasonPosters_Enabled = form.querySelector("#SeasonPosters_Enabled").checked; // Fork: posters
 
             config.Metadata_StudioOnlyAnimationWorks = form.querySelector("#Metadata_StudioOnlyAnimationWorks").checked;
             ([config.ContentRatingList, config.ContentRatingOrder] = retrieveSortableCheckboxList(form, "Metadata_ContentRatingList"));
@@ -617,6 +661,10 @@ function applyFormToConfig(form, config) {
             config.AddExtraInfoToLinkName = form.querySelector("#AddExtraInfoToLinkName").checked;
             config.MaxLinksPerTypeToShow = sanitizeNumber(form.querySelector("#MaxLinksPerTypeToShow").value, 0);
             form.querySelector("#MaxLinksPerTypeToShow").value = config.MaxLinksPerTypeToShow;
+
+            // Fork: TheIntroDB
+            config.IntroDB_Enabled = form.querySelector("#IntroDB_Enabled").checked;
+            config.IntroDB_ApiKey = form.querySelector("#IntroDB_ApiKey").value.trim();
             break;
         }
 
@@ -684,6 +732,11 @@ function applyFormToConfig(form, config) {
             config.VFS_AddReleaseGroup = form.querySelector("#VFS_AddReleaseGroup").checked;
             config.VFS_AddResolution = form.querySelector("#VFS_AddResolution").checked;
             config.VFS_UseSourceFileAsVersionIdentifier = form.querySelector("#VFS_UseSourceFileAsVersionIdentifier").checked;
+            // Fork: VFS
+            config.VFS_PreserveThemeSongs = form.querySelector("#VFS_PreserveThemeSongs").checked;
+            config.VFS_SyncThemeSongs = form.querySelector("#VFS_SyncThemeSongs").checked;
+            config.VFS_SkipCoveredVariations = form.querySelector("#VFS_SkipCoveredVariations").checked;
+            // End fork: VFS
 
             config.VFS_Threads = vfsTreads;
             form.querySelector("#VFS_Threads").value = vfsTreads;
@@ -733,6 +786,11 @@ function applyFormToConfig(form, config) {
             config.SignalR_AutoReconnectInSeconds = reconnectIntervals;
             form.querySelector("#SignalRAutoReconnectIntervals").value = reconnectIntervals.join(", ");
             config.SignalR_EventSources = retrieveCheckboxList(form, "SignalREventSources");
+            // Fork: events
+            config.SignalR_CatchUpOnReconnect = form.querySelector("#SignalRCatchUpOnReconnect").checked;
+            config.SignalR_PeriodicCatchUpIntervalInHours = Math.max(0, parseInt(form.querySelector("#SignalRPeriodicCatchUpInterval").value, 10) || 0);
+            form.querySelector("#SignalRPeriodicCatchUpInterval").value = config.SignalR_PeriodicCatchUpIntervalInHours.toString();
+            // End fork: events
 
             config.SignalR_FileEvents = form.querySelector("#SignalRDefaultFileEvents").checked;
             config.SignalR_RefreshEnabled = form.querySelector("#SignalRDefaultRefreshEvents").checked;
@@ -863,6 +921,8 @@ async function applyConfigToForm(form, config) {
             form.querySelector("#Title_ConfigureFor_Enabled").disabled = config.Title[State.metadata.title].Enabled === undefined;
             form.querySelector("#MarkSpecialsWhenGrouped").checked = config.MarkSpecialsWhenGrouped;
             form.querySelector("#AlwaysUseEpisodeTitleForTmdbMovies").checked = config.AlwaysUseEpisodeTitleForTmdbMovies;
+            // Fork: titles
+            form.querySelector("#ShortenSeasonTitles").checked = config.ShortenSeasonTitles;
             form.querySelector("#RemoveDuplicateTitles").checked = config.Title[State.metadata.title].RemoveDuplicates;
             renderSortableCheckboxList(form, "TitleMainList", config.Title[State.metadata.title].MainTitle.List, config.Title[State.metadata.title].MainTitle.Order);
             form.querySelector("#TitleMainAllowAny").checked = config.Title[State.metadata.title].MainTitle.AllowAny;
@@ -902,6 +962,7 @@ async function applyConfigToForm(form, config) {
             renderSortableCheckboxList(form, "Image_LogoList", config.Image[State.metadata.image].LogoList, config.Image[State.metadata.image].LogoOrder);
             renderSortableCheckboxList(form, "Image_BackdropList", config.Image[State.metadata.image].BackdropList, config.Image[State.metadata.image].BackdropOrder);
             form.querySelector("#Image_DebugMode").checked = config.Image.DebugMode;
+            form.querySelector("#SeasonPosters_Enabled").checked = config.SeasonPosters_Enabled !== false; // Fork: posters
 
             form.querySelector("#Metadata_StudioOnlyAnimationWorks").checked = config.Metadata_StudioOnlyAnimationWorks;
             renderSortableCheckboxList(form, "Metadata_ContentRatingList", config.ContentRatingList, config.ContentRatingOrder);
@@ -910,6 +971,10 @@ async function applyConfigToForm(form, config) {
             renderCheckboxList(form, "Metadata_ThirdPartyDisplayLinkList", (config.ThirdPartyDisplayLinkList || []).map(s => s.trim()).filter(s => s));
             form.querySelector("#AddExtraInfoToLinkName").checked = config.AddExtraInfoToLinkName;
             form.querySelector("#MaxLinksPerTypeToShow").value = config.MaxLinksPerTypeToShow;
+
+            // Fork: TheIntroDB
+            form.querySelector("#IntroDB_Enabled").checked = config.IntroDB_Enabled;
+            form.querySelector("#IntroDB_ApiKey").value = config.IntroDB_ApiKey || "";
             break;
         }
 
@@ -958,6 +1023,11 @@ async function applyConfigToForm(form, config) {
             form.querySelector("#VFS_AddReleaseGroup").checked = config.VFS_AddReleaseGroup;
             form.querySelector("#VFS_AddResolution").checked = config.VFS_AddResolution;
             form.querySelector("#VFS_UseSourceFileAsVersionIdentifier").checked = config.VFS_UseSourceFileAsVersionIdentifier;
+            // Fork: VFS
+            form.querySelector("#VFS_PreserveThemeSongs").checked = config.VFS_PreserveThemeSongs;
+            form.querySelector("#VFS_SyncThemeSongs").checked = config.VFS_SyncThemeSongs;
+            form.querySelector("#VFS_SkipCoveredVariations").checked = config.VFS_SkipCoveredVariations;
+            // End fork: VFS
 
             form.querySelector("#VFS_Threads").value = config.VFS_Threads;
             form.querySelector("#VFS_ResolveLinks").checked = config.VFS_ResolveLinks;
@@ -985,6 +1055,10 @@ async function applyConfigToForm(form, config) {
             form.querySelector("#SignalRAutoConnect").checked = config.SignalR_AutoConnectEnabled;
             form.querySelector("#SignalRAutoReconnectIntervals").value = config.SignalR_AutoReconnectInSeconds.join(", ");
             renderCheckboxList(form, "SignalREventSources", config.SignalR_EventSources);
+            // Fork: events
+            form.querySelector("#SignalRCatchUpOnReconnect").checked = config.SignalR_CatchUpOnReconnect;
+            form.querySelector("#SignalRPeriodicCatchUpInterval").value = (config.SignalR_PeriodicCatchUpIntervalInHours ?? 0).toString();
+            // End fork: events
 
             form.querySelector("#SignalRDefaultFileEvents").checked = config.SignalR_FileEvents;
             form.querySelector("#SignalRDefaultRefreshEvents").checked = config.SignalR_RefreshEnabled;

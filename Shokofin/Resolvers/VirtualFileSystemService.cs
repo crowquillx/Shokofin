@@ -32,7 +32,7 @@ using File = System.IO.File;
 
 namespace Shokofin.Resolvers;
 
-public class VirtualFileSystemService {
+public partial class VirtualFileSystemService {
     const string TrickplayExtensionName = ".trickplay";
 
     private readonly ShokoApiManager ApiManager;
@@ -430,8 +430,14 @@ public class VirtualFileSystemService {
             var pathToReport = pathToClean ?? Path.GetDirectoryName(path)!;
             LibraryMonitor.ReportFileSystemChangeBeginning(pathToReport);
 
-            // Generate any new structure in the VFS.
-            var result = await GenerateStructure(collectionType, vfsPath, allFiles, cancellationToken: cancellationToken);
+            // Generate any new structure in the VFS. Theme songs are only synced
+            // on full generations of the whole library, since pairing a media
+            // folder with a show needs to know every file in it.
+            var mediaFolderPaths = mediaConfigs.Select(mediaConfig => mediaConfig.Path).Distinct().ToList();
+            var generatedLinks = Plugin.Instance.Configuration.VFS_SyncThemeSongs && pathToClean == vfsPath && !lastGeneratedAt.HasValue
+                ? new ConcurrentBag<(string sourceLocation, string[] symbolicLinks)>()
+                : null;
+            var result = await GenerateStructure(collectionType, vfsPath, allFiles, generatedLinks: generatedLinks, cancellationToken: cancellationToken);
 
             // Detect path changes and migrate user data to new paths before
             // cleaning up the old structure.
@@ -448,6 +454,11 @@ public class VirtualFileSystemService {
                     UserDataMigrationService.MigratePaths(oldToNewPathMap);
                 }
             }
+
+            // Share theme songs with the media folders before cleaning up, so
+            // the cleanup sees the links it should keep.
+            if (generatedLinks is not null)
+                result += SyncThemeSongs(vfsPath, mediaFolderPaths, generatedLinks, cancellationToken);
 
             // Cleanup any residual entries from old structure in the VFS if interactive
             // generation is disabled, or if it's enabled and we generated something new.
@@ -467,14 +478,14 @@ public class VirtualFileSystemService {
                         cancellationToken: cancellationToken
                     );
                     result.SkippedVideos = allPaths.Except(newPaths).Count();
-                    result += CleanupStructure(vfsPath, pathToClean, allPaths, cancellationToken: cancellationToken);
+                    result += CleanupStructure(vfsPath, pathToClean, allPaths, mediaFolderPaths: mediaFolderPaths, cancellationToken: cancellationToken);
                     // The resolver only care about the new files, if any, so revert the
                     // paths back to the original ones after the cleanup.
                     result.Paths = [.. newPaths];
                 }
                 else {
                     var allPaths = result.Paths.ToArray();
-                    result += CleanupStructure(vfsPath, pathToClean, allPaths, cancellationToken: cancellationToken);
+                    result += CleanupStructure(vfsPath, pathToClean, allPaths, mediaFolderPaths: mediaFolderPaths, cancellationToken: cancellationToken);
                 }
             }
 
@@ -633,6 +644,7 @@ public class VirtualFileSystemService {
             .Where(tuple => tuple.episodeIds.Overlaps(episodeIds))
             .SelectMany(tuple => tuple.file.Locations.Select(location => (tuple.file, tuple.seriesId, location)))
             .ToList();
+        var variationFilter = VariationFilter.FromConfiguration();
         foreach (var (file, fileSeriesId, location) in fileLocations) {
             foreach (var (managedFolderId, managedFolderSubPath, mediaFolderPaths) in mediaConfigs.ToManagedFolderList()) {
                 if (location.ManagedFolderId != managedFolderId || managedFolderSubPath.Length != 0 && !location.RelativePath.StartsWith(managedFolderSubPath))
@@ -643,6 +655,9 @@ public class VirtualFileSystemService {
                     if (!fileExists(sourceLocation))
                         continue;
 
+                    if (!variationFilter.Accept(file, sourceLocation, fileSeriesId))
+                        goto forLoopBreak;
+
                     totalFiles++;
                     yield return (sourceLocation, file.Id.ToString(), fileSeriesId);
                     goto forLoopBreak;
@@ -652,6 +667,13 @@ public class VirtualFileSystemService {
                 forLoopBreak: break;
             }
         }
+
+        foreach (var (sourceLocation, file, fileSeriesId) in variationFilter.TakeRemaining()) {
+            totalFiles++;
+            yield return (sourceLocation, file.Id.ToString(), fileSeriesId);
+        }
+        if (variationFilter.Skipped > 0)
+            Logger.LogDebug("Left out {Count} variation file(s) for episodes another file already covers. (Episode={EpisodeId},Season={SeasonId},Library={LibraryId})", variationFilter.Skipped, episodeId, seasonId, mediaConfigs[0].LibraryId);
 
         var timeSpent = DateTime.UtcNow - start;
         Logger.LogDebug(
@@ -681,6 +703,7 @@ public class VirtualFileSystemService {
         // Only return the files for the given season.
         var totalFiles = 0;
         var configList = mediaConfigs.ToManagedFolderList();
+        var variationFilter = VariationFilter.FromConfiguration();
         if (seasonNumber.HasValue) {
             // Special handling of specials (pun intended)
             if (seasonNumber.Value is 0) {
@@ -700,6 +723,9 @@ public class VirtualFileSystemService {
                                 var sourceLocation = Path.Join(mediaFolderPath, location.RelativePath[managedFolderSubPath.Length..]);
                                 if (!fileExists(sourceLocation))
                                     continue;
+
+                                if (!variationFilter.Accept(file, sourceLocation, fileSeriesId))
+                                    goto forLoopBreak;
 
                                 totalFiles++;
                                 yield return (sourceLocation, file.Id.ToString(), fileSeriesId);
@@ -734,6 +760,9 @@ public class VirtualFileSystemService {
                                 if (!fileExists(sourceLocation))
                                     continue;
 
+                                if (!variationFilter.Accept(file, sourceLocation, fileSeriesId))
+                                    goto forLoopBreak;
+
                                 totalFiles++;
                                 yield return (sourceLocation, file.Id.ToString(), fileSeriesId);
                                 goto forLoopBreak;
@@ -763,6 +792,9 @@ public class VirtualFileSystemService {
                             if (!fileExists(sourceLocation))
                                 continue;
 
+                            if (!variationFilter.Accept(file, sourceLocation, fileSeriesId))
+                                goto forLoopBreak;
+
                             totalFiles++;
                             yield return (sourceLocation, file.Id.ToString(), fileSeriesId);
                             goto forLoopBreak;
@@ -774,6 +806,13 @@ public class VirtualFileSystemService {
                 }
             }
         }
+
+        foreach (var (sourceLocation, file, fileSeriesId) in variationFilter.TakeRemaining()) {
+            totalFiles++;
+            yield return (sourceLocation, file.Id.ToString(), fileSeriesId);
+        }
+        if (variationFilter.Skipped > 0)
+            Logger.LogDebug("Left out {Count} variation file(s) for episodes another file already covers. (MainSeason={MainSeasonId},Season={SeasonNumber},Library={LibraryId})", variationFilter.Skipped, seasonId, seasonNumber, mediaConfigs[0].LibraryId);
 
         var timeSpent = DateTime.UtcNow - start;
         Logger.LogDebug(
@@ -795,6 +834,7 @@ public class VirtualFileSystemService {
         var libraryId = mediaConfigs[0].LibraryId;
         var collectAndSort = Plugin.Instance.Configuration.VFS_CollectAndSort;
         var collected = new List<(string sourceLocation, string fileId, string seriesId)>();
+        var variationFilter = VariationFilter.FromConfiguration();
         foreach (var (managedFolderId, managedFolderSubPath, mediaFolderPaths) in mediaConfigs.ToManagedFolderList()) {
             var firstPage = ApiClient.GetFilesInManagedFolder(managedFolderId, managedFolderSubPath);
             var pageData = firstPage
@@ -854,6 +894,9 @@ public class VirtualFileSystemService {
                             totalSingleSeriesFiles++;
                             var seriesId = seriesIds.First().ToString();
                             singleSeriesIds.Add(seriesId);
+                            // Hold back variations until we know which episodes the other files cover.
+                            if (!variationFilter.Accept(file, sourceLocation, seriesId))
+                                break;
                             // Skip files that were generated before the last generated at time if we're doing an iterative run,
                             // but still add it to the bag for validation of removed files.
                             if (lastGeneratedAt.HasValue) {
@@ -895,6 +938,9 @@ public class VirtualFileSystemService {
                     .Select(tuple => tuple.seriesId)
                     .ToList();
                 foreach (var seriesId in seriesIds) {
+                    // Hold back variations until we know which episodes the other files cover.
+                    if (!variationFilter.Accept(file, sourceLocation, seriesId))
+                        continue;
                     // Skip files that were generated before the last generated at time if we're doing an iterative run,
                     // but still add it to the bag for validation of removed files.
                     if (lastGeneratedAt.HasValue) {
@@ -911,6 +957,23 @@ public class VirtualFileSystemService {
                 totalMultiSeriesFiles += seriesIds.Count;
             }
         }
+
+        // Add the variations still needed for episodes no other file covers.
+        foreach (var (sourceLocation, file, seriesId) in variationFilter.TakeRemaining()) {
+            // Skip files that were generated before the last generated at time if we're doing an iterative run,
+            // but still add it to the bag for validation of removed files.
+            if (lastGeneratedAt.HasValue) {
+                knownFileSeriesBag!.Add((file.Id.ToString(), seriesId));
+                if ((file.ImportedAt ?? file.CreatedAt) < lastGeneratedAt.Value)
+                    continue;
+            }
+            if (collectAndSort)
+                collected.Add((sourceLocation, file.Id.ToString(), seriesId));
+            else
+                yield return (sourceLocation, file.Id.ToString(), seriesId);
+        }
+        if (variationFilter.Skipped > 0)
+            Logger.LogDebug("Left out {Count} variation file(s) for episodes another file already covers. (Library={LibraryId})", variationFilter.Skipped, libraryId);
 
         // If collect and sort is enabled, yield the collected files after sorting them now.
         if (collectAndSort)
@@ -934,7 +997,7 @@ public class VirtualFileSystemService {
         return await ApiClient.GetFilesInManagedFolder(managedFolderId, managedFolderSubPath, page);
     }
 
-    private async Task<LinkGenerationResult> GenerateStructure(CollectionType? collectionType, string vfsPath, IEnumerable<(string sourceLocation, string fileId, string seriesId)> allFiles, bool preview = false, CancellationToken cancellationToken = default) {
+    private async Task<LinkGenerationResult> GenerateStructure(CollectionType? collectionType, string vfsPath, IEnumerable<(string sourceLocation, string fileId, string seriesId)> allFiles, bool preview = false, ConcurrentBag<(string sourceLocation, string[] symbolicLinks)>? generatedLinks = null, CancellationToken cancellationToken = default) {
         var result = new LinkGenerationResult();
         var maxTotalExceptions = Plugin.Instance.Configuration.VFS_MaxTotalExceptionsBeforeAbort;
         var maxSeriesExceptions = Plugin.Instance.Configuration.VFS_MaxSeriesExceptionsBeforeAbort;
@@ -960,6 +1023,7 @@ public class VirtualFileSystemService {
                         return;
 
                     var subResult = GenerateSymbolicLinks(vfsPath, sourceLocation, symbolicLinks, importedAt.Value, preview);
+                    generatedLinks?.Add((sourceLocation, symbolicLinks));
 
                     // Combine the current results with the overall results.
                     lock (semaphore) {
@@ -995,6 +1059,7 @@ public class VirtualFileSystemService {
                     if (symbolicLinks.Length == 0 || !importedAt.HasValue)
                         return;
                     var subResult = GenerateSymbolicLinks(vfsPath, sourceLocation, symbolicLinks, importedAt.Value, preview);
+                    generatedLinks?.Add((sourceLocation, symbolicLinks));
                     // Combine the current results with the overall results.
                     lock (cancelTokenSource) {
                         result += subResult;
@@ -1427,7 +1492,7 @@ public class VirtualFileSystemService {
 
     #region Cleanup Structure
 
-    private LinkGenerationResult CleanupStructure(string vfsPath, string directoryToClean, IReadOnlyList<string> allKnownPaths, bool preview = false, CancellationToken cancellationToken = default) {
+    private LinkGenerationResult CleanupStructure(string vfsPath, string directoryToClean, IReadOnlyList<string> allKnownPaths, bool preview = false, IReadOnlyList<string>? mediaFolderPaths = null, CancellationToken cancellationToken = default) {
         if (!Directory.Exists(directoryToClean)) {
             if (!preview)
                 Logger.LogDebug("Skipped cleaning up folder because it does not exist: {Path}", directoryToClean);
@@ -1448,6 +1513,12 @@ public class VirtualFileSystemService {
         if (!preview)
             Logger.LogDebug("Found {FileCount} file system entries to potentially remove or fix in {TimeSpent} in folder: {DirectoryToClean}", entriesToBeRemoved.Count, nextStep - previousStep, directoryToClean);
         previousStep = nextStep;
+
+        // Keep theme songs that were put in the VFS by something else, as long
+        // as the show or season they're in is still there.
+        var themeContext = Plugin.Instance.Configuration.VFS_PreserveThemeSongs || Plugin.Instance.Configuration.VFS_SyncThemeSongs
+            ? CreateThemeCleanupContext(vfsPath, allKnownPaths, mediaFolderPaths)
+            : null;
 
         Parallelize(entriesToBeRemoved, (path) => {
             var (location, extName) = path;
@@ -1496,7 +1567,16 @@ public class VirtualFileSystemService {
                 result.RemovedTrickplayDirectories++;
             }
             else if (NamingOptions.SubtitleFileExtensions.Contains(extName) || NamingOptions.AudioFileExtensions.Contains(extName)) {
-                if (ShouldIgnoreFile(vfsPath, location)) {
+                if (
+                    themeContext is not null &&
+                    IsAudioFile(location) &&
+                    !TryGetIdsForPath(location, out _, out _) &&
+                    TryGetThemeOwnerDirectory(vfsPath, location, out var themeOwnerDirectory)
+                ) {
+                    if (TryKeepThemeSongDuringCleanup(themeContext, vfsPath, location, themeOwnerDirectory, result, preview))
+                        return;
+                }
+                else if (ShouldIgnoreFile(vfsPath, location)) {
                     result.Paths.Add(location);
                     result.SkippedExternalFiles++;
                     return;

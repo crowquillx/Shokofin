@@ -1,10 +1,14 @@
 name: "Shoko"
 guid: "5216ccbf-d24a-4eb3-8a7e-7da4230b7052"
-imageUrl: https://raw.githubusercontent.com/ShokoAnime/Shokofin/metadata/banner.png
+imageUrl: https://raw.githubusercontent.com/crowquillx/Shokofin/metadata/banner.png
 targetAbi: "1.0.0.0"
-owner: "ShokoAnime"
-overview: "Manage your anime from Jellyfin using metadata from Shoko"
+owner: "crowquillx"
+overview: "Manage your anime from Jellyfin using metadata from Shoko (personal fork)"
 description: >
+  **Personal fork** of [Shokofin](https://github.com/ShokoAnime/Shokofin). It
+  may not be maintained or well-tested. See
+  [crowquillx/Shokofin](https://github.com/crowquillx/Shokofin).
+
   A Jellyfin plugin to integrate [Jellyfin](https://jellyfin.org/docs/) with
   [Shoko Server](https://shokoanime.com/downloads/shoko-server/).
 

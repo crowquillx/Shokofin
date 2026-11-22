@@ -47,6 +47,15 @@ public class EpisodeInfo : IExtendedItemInfo {
 
     public string Title { get; init; }
 
+    /// <summary>
+    /// Indicates Shoko made <see cref="Title"/> up because AniDB has no title
+    /// for the episode, e.g. "第12話" or "Folge 5". Daily Shoko drops AniDB's
+    /// generic titles and names such episodes in the first language of its
+    /// episode title settings. Such an episode has no AniDB titles, unless a
+    /// Shoko user named it.
+    /// </summary>
+    public bool IsTitleSynthesized { get; init; }
+
     public IReadOnlyList<Title> Titles { get; init; }
 
     public string? Overview { get; init; }
@@ -165,6 +174,7 @@ public class EpisodeInfo : IExtendedItemInfo {
         EpisodeNumber = episode.AniDB.EpisodeNumber;
         ExtraType = Ordering.GetExtraType(episode.AniDB);
         Title = episode.Name;
+        IsTitleSynthesized = !episode.HasCustomName && episode.AniDB.Id > 0 && episode.AniDB.Titles.Count == 0;
         Titles = [
             ..episode.AniDB.Titles,
             ..(tmdbEntity?.Titles ?? []),
