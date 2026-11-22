@@ -2,6 +2,10 @@ using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 
+#if NET9_0_OR_GREATER
+using MediaBrowser.Controller.MediaSegments;
+#endif
+
 namespace Shokofin;
 
 /// <inheritdoc />
@@ -25,6 +29,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator {
         serviceCollection.AddSingleton<SignalR.SignalRConnectionManager>();
         serviceCollection.AddSingleton<Database.UserDataRepositoryService>();
         serviceCollection.AddSingleton<Database.UserDataMigrationService>();
+        // Fork: TheIntroDB
+        serviceCollection.AddSingleton<MediaSegments.TheIntroDbClient>();
+        serviceCollection.AddSingleton<IMediaSegmentProvider, MediaSegments.TheIntroDbSegmentProvider>();
         serviceCollection.AddHostedService<SignalR.SignalREntryPoint>();
         serviceCollection.AddHostedService<Resolvers.ShokoLibraryMonitor>();
         serviceCollection.AddControllers(options => {

@@ -585,6 +585,8 @@ export const LibraryMenu = globalThis.LibraryMenu;
  *   SeasonMerging_SeriesTypes: SeriesType[];
  *   SeasonMerging_MergeWindowInDays: number;
  *   Playlist: PlaylistConfiguration;
+ *   IntroDB_Enabled: boolean; // Fork: TheIntroDB
+ *   IntroDB_ApiKey: string; // Fork: TheIntroDB
  *   Misc_ShowInMenu: boolean;
  *   AdvancedMode: boolean;
  *   Debug: DebugConfiguration;
