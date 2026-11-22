@@ -725,6 +725,34 @@ public class PluginConfiguration : BasePluginConfiguration {
     [Range(0, 100)]
     public int VFS_IterativeGenerationMaxCount { get; set; } = 0;
 
+    // Fork: VFS
+
+    /// <summary>
+    /// Keep theme songs that something other than the plugin put in a VFS show
+    /// or season folder, such as a theme song plugin's <c>theme.mp3</c>,
+    /// instead of removing them when the VFS is cleaned up.
+    /// </summary>
+    public bool VFS_PreserveThemeSongs { get; set; } = true;
+
+    /// <summary>
+    /// Share theme songs between the VFS and the media folders. Theme songs in
+    /// a media folder are linked into the matching VFS show or season folder,
+    /// and theme songs written into the VFS are copied to the media folder.
+    /// Only media folders where every file belongs to the same show (or
+    /// season) are used, and nothing in a media folder is ever overwritten or
+    /// removed. Implies <see cref="VFS_PreserveThemeSongs"/>.
+    /// </summary>
+    public bool VFS_SyncThemeSongs { get; set; } = false;
+
+    /// <summary>
+    /// Leave out files marked as a variation in Shoko for the episodes another
+    /// file that is not a variation already covers. A variation is kept when
+    /// it is the only file for one of its episodes.
+    /// </summary>
+    public bool VFS_SkipCoveredVariations { get; set; } = false;
+
+    // End fork: VFS
+
     #endregion
 
     #region Media Folder
