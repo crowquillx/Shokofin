@@ -851,6 +851,22 @@ public class PluginConfiguration : BasePluginConfiguration {
 
     #endregion
 
+    #region Fork: TheIntroDB
+
+    // Fork: TheIntroDB
+    /// <summary>
+    /// Provide intro, recap, credits and preview segments from TheIntroDB,
+    /// looked up by the TMDB episode or movie Shoko links each item to.
+    /// </summary>
+    public bool IntroDB_Enabled { get; set; }
+
+    /// <summary>
+    /// Optional TheIntroDB API key, which raises the daily lookup budget.
+    /// </summary>
+    public string IntroDB_ApiKey { get; set; }
+
+    #endregion
+
     public PluginConfiguration() {
         Url = "http://127.0.0.1:8111";
         PublicUrl = string.Empty;
@@ -954,5 +970,8 @@ public class PluginConfiguration : BasePluginConfiguration {
         MetadataRefresh = new();
         Misc_ShowInMenu = false;
         AdvancedMode = false;
+        // Fork: TheIntroDB
+        IntroDB_Enabled = false;
+        IntroDB_ApiKey = string.Empty;
     }
 }

@@ -36,7 +36,7 @@ promise.then(({
 //#region Constants
 
 /**
- * @typedef {"Connection" | "Metadata_Title" | "Metadata_Description" | "Metadata_TagGenre" | "Metadata_Image" | "Metadata_Misc" | "Library_Basic" | "Library_Collection" | "Library_Playlist" | "Library_MultipleVersions" | "Library_MediaFolder" | "Library_SeasonMerging" | "VFS_Basic" | "VFS_Location" | "User" | "Series" | "SignalR_Connection" | "SignalR_Basic" | "SignalR_Library_New" | "SignalR_Library_Existing" | "Misc" | "Debug" | "Utilities"} SectionType
+ * @typedef {"Connection" | "Metadata_Title" | "Metadata_Description" | "Metadata_TagGenre" | "Metadata_Image" | "Metadata_Misc" | "Metadata_IntroDB" | "Library_Basic" | "Library_Collection" | "Library_Playlist" | "Library_MultipleVersions" | "Library_MediaFolder" | "Library_SeasonMerging" | "VFS_Basic" | "VFS_Location" | "User" | "Series" | "SignalR_Connection" | "SignalR_Basic" | "SignalR_Library_New" | "SignalR_Library_Existing" | "Misc" | "Debug" | "Utilities"} SectionType
  */
 
 const MaxDebugPresses = 7;
@@ -51,6 +51,7 @@ const Sections = [
     "Metadata_TagGenre",
     "Metadata_Image",
     "Metadata_Misc",
+    "Metadata_IntroDB", // Fork: TheIntroDB
     "Library_Basic",
     "Library_Collection",
     "Library_Playlist",
@@ -477,6 +478,7 @@ async function updateView(view, form, config) {
 
         case "metadata":
             activeSections.push("Metadata_Title", "Metadata_Description", "Metadata_TagGenre", "Metadata_Image", "Metadata_Misc");
+            activeSections.push("Metadata_IntroDB"); // Fork: TheIntroDB
             if (form.querySelector("#Title_ConfigureFor").value !== State.metadata.title) {
                 form.querySelector("#Title_ConfigureFor").value = State.metadata.title;
             }
@@ -619,6 +621,10 @@ function applyFormToConfig(form, config) {
             config.AddExtraInfoToLinkName = form.querySelector("#AddExtraInfoToLinkName").checked;
             config.MaxLinksPerTypeToShow = sanitizeNumber(form.querySelector("#MaxLinksPerTypeToShow").value, 0);
             form.querySelector("#MaxLinksPerTypeToShow").value = config.MaxLinksPerTypeToShow;
+
+            // Fork: TheIntroDB
+            config.IntroDB_Enabled = form.querySelector("#IntroDB_Enabled").checked;
+            config.IntroDB_ApiKey = form.querySelector("#IntroDB_ApiKey").value.trim();
             break;
         }
 
@@ -914,6 +920,10 @@ async function applyConfigToForm(form, config) {
             renderCheckboxList(form, "Metadata_ThirdPartyDisplayLinkList", (config.ThirdPartyDisplayLinkList || []).map(s => s.trim()).filter(s => s));
             form.querySelector("#AddExtraInfoToLinkName").checked = config.AddExtraInfoToLinkName;
             form.querySelector("#MaxLinksPerTypeToShow").value = config.MaxLinksPerTypeToShow;
+
+            // Fork: TheIntroDB
+            form.querySelector("#IntroDB_Enabled").checked = config.IntroDB_Enabled;
+            form.querySelector("#IntroDB_ApiKey").value = config.IntroDB_ApiKey || "";
             break;
         }
 

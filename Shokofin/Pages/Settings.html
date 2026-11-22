@@ -1638,6 +1638,27 @@ form:not(.advanced-mode) .advanced-only {
                             <span>${Save}</span>
                         </button>
                     </fieldset>
+                    <!-- Fork: TheIntroDB -->
+                    <fieldset id="Metadata_IntroDB_Section" class="verticalSection verticalSection-extrabottompadding" hidden>
+                        <legend>
+                            <h3>Intro &amp; Credits Markers (TheIntroDB)</h3>
+                        </legend>
+                        <div class="fieldDescription verticalSection-extrabottompadding">Provides intro, recap, credits and preview segments from <a href="https://theintrodb.org" target="_blank" rel="noopener noreferrer">TheIntroDB</a>, looked up by the TMDB episode or movie Shoko links each item to, so the numbering of a Shoko series or group does not matter. Items without a TMDB link in Shoko get no segments. Nothing is ever submitted to TheIntroDB. After enabling it, make sure the "TheIntroDB (Shoko)" media segment provider is enabled in the library settings, and turn off any other provider that looks segments up by Jellyfin's season and episode numbers for Shoko libraries.</div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="IntroDB_Enabled" />
+                                <span>Get markers from TheIntroDB</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Look up media segments in TheIntroDB for episodes and movies managed by the plugin. Credits and previews are only used when TheIntroDB timed them on a release within 5 minutes of the file's length.</div>
+                        </div>
+                        <div class="inputContainer inputContainer-withDescription">
+                            <input is="emby-input" type="password" id="IntroDB_ApiKey" label="TheIntroDB API Key" autocomplete="off" />
+                            <div class="fieldDescription">Optional. Lookups work without an account, but TheIntroDB allows only a limited number of anonymous lookups a day. A key from your theintrodb.org account raises that budget.</div>
+                        </div>
+                        <button is="emby-button" type="submit" name="settings" class="raised button-submit block emby-button">
+                            <span>${Save}</span>
+                        </button>
+                    </fieldset>
                     <fieldset id="Library_Basic_Section" class="verticalSection verticalSection-extrabottompadding" hidden>
                         <legend>
                             <h3>Basic Settings</h3>
