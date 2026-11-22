@@ -9,6 +9,7 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model;
 using MediaBrowser.Model.MediaSegments;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shokofin.API;
 using Shokofin.API.Info;
@@ -35,14 +36,32 @@ namespace Shokofin.MediaSegments;
 /// to, numbered in that TMDB show's default order, and a movie by its linked
 /// TMDB movie. An item without a TMDB link gets no segments. It never submits
 /// anything to TheIntroDB.
+/// <para>
+/// Jellyfin creates media segment providers while it starts, before it loads
+/// plugins and sets <see cref="Plugin.Instance"/>. Shokofin's API services read
+/// the plugin configuration when they are created, so this provider takes only
+/// the service provider and looks them up the first time it is used.
+/// </para>
 /// </remarks>
 public class TheIntroDbSegmentProvider(
     ILogger<TheIntroDbSegmentProvider> logger,
-    ILibraryManager libraryManager,
-    ShokoApiManager apiManager,
-    ShokoIdLookup lookup,
-    TheIntroDbClient client
+    IServiceProvider serviceProvider
 ) : IMediaSegmentProvider {
+    private ILibraryManager libraryManager => serviceProvider.GetRequiredService<ILibraryManager>();
+
+    private ShokoApiManager apiManager => serviceProvider.GetRequiredService<ShokoApiManager>();
+
+    private ShokoIdLookup lookup => serviceProvider.GetRequiredService<ShokoIdLookup>();
+
+    private TheIntroDbClient client => serviceProvider.GetRequiredService<TheIntroDbClient>();
+
+    /// <summary>
+    /// Whether the plugin is loaded and lookups are turned on. Jellyfin may ask
+    /// before the plugin is loaded.
+    /// </summary>
+    private static bool IsEnabled
+        => Plugin.Instance?.Configuration is { IntroDB_Enabled: true };
+
     /// <summary>
     /// How far a release TheIntroDB timed may differ in length from the file
     /// before its credits and previews stop applying. Intros and recaps are
@@ -56,7 +75,7 @@ public class TheIntroDbSegmentProvider(
     /// <inheritdoc />
     public ValueTask<bool> Supports(BaseItem item)
         => ValueTask.FromResult(
-            Plugin.Instance.Configuration.IntroDB_Enabled &&
+            IsEnabled &&
             item is Episode or Movie &&
             lookup.IsEnabledForItem(item)
         );
@@ -70,7 +89,7 @@ public class TheIntroDbSegmentProvider(
 #else
         IReadOnlyList<MediaSegmentDto> existing = [];
 #endif
-        if (!Plugin.Instance.Configuration.IntroDB_Enabled)
+        if (!IsEnabled)
             return existing;
 
         if (libraryManager.GetItemById(request.ItemId) is not { } item || item is not (Episode or Movie))
