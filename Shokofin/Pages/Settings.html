@@ -2354,6 +2354,21 @@ form:not(.advanced-mode) .advanced-only {
                             </div>
                             <div class="fieldDescription">Which event sources should be listened to for metadata events.</div>
                         </div>
+                        <!-- Fork: events -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="SignalRCatchUpOnReconnect" />
+                                <span>Catch Up After Reconnecting</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Shoko does not resend the events it sent while the connection was down. When enabled, the libraries with file or refresh events enabled are scanned once after the connection comes back, at most every 10 minutes.
+                            </div>
+                        </div>
+                        <div class="inputContainer inputContainer-withDescription">
+                            <input is="emby-input" type="number" id="SignalRPeriodicCatchUpInterval" min="0" step="1" label="Periodic Catch-up Interval (hours)" />
+                            <div class="fieldDescription">Also scan those libraries on this interval while connected, to pick up changes Shoko sends no event for. Set to 0 to turn it off.</div>
+                        </div>
+                        <!-- End fork: events -->
                         <button is="emby-button" type="submit" name="settings" class="raised button-submit block emby-button">
                             <span>${Save}</span>
                         </button>

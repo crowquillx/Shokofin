@@ -580,6 +580,8 @@ export const LibraryMenu = globalThis.LibraryMenu;
  *   SignalR_RefreshEnabled: boolean;
  *   SignalR_FileEvents: boolean;
  *   SignalR_EventSources: GenericProvider[];
+ *   SignalR_CatchUpOnReconnect: boolean;
+ *   SignalR_PeriodicCatchUpIntervalInHours: number;
  *   SeasonMerging_Enabled: boolean;
  *   SeasonMerging_DefaultBehavior: SeasonMergingBehavior;
  *   SeasonMerging_SeriesTypes: SeriesType[];

@@ -8,15 +8,22 @@ using System.Timers;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using IDirectoryService = MediaBrowser.Controller.Providers.IDirectoryService;
+using IProviderManager = MediaBrowser.Controller.Providers.IProviderManager;
+using MetadataRefreshMode = MediaBrowser.Controller.Providers.MetadataRefreshMode;
+using MetadataRefreshOptions = MediaBrowser.Controller.Providers.MetadataRefreshOptions;
+using RefreshPriority = MediaBrowser.Controller.Providers.RefreshPriority;
 using Microsoft.Extensions.Logging;
 using Shokofin.API;
 using Shokofin.API.Info;
 using Shokofin.Configuration;
 using Shokofin.Events.Interfaces;
+using Shokofin.Events.Stub;
 using Shokofin.Extensions;
 using Shokofin.ExternalIds;
 using Shokofin.Resolvers;
 using Shokofin.Resolvers.Models;
+using Shokofin.SignalR.Models;
 using Shokofin.Utils;
 
 using File = System.IO.File;
@@ -49,6 +56,10 @@ public class EventDispatchService {
 
     private readonly UsageTracker UsageTracker;
 
+    private readonly IProviderManager ProviderManager;
+
+    private readonly IDirectoryService DirectoryService;
+
     private int ChangesDetectionSubmitterCount = 0;
 
     private readonly Timer ChangesDetectionTimer;
@@ -77,7 +88,9 @@ public class EventDispatchService {
         MediaFolderConfigurationService configurationService,
         VirtualFileSystemService resolveManager,
         ILogger<EventDispatchService> logger,
-        UsageTracker usageTracker
+        UsageTracker usageTracker,
+        IProviderManager providerManager,
+        IDirectoryService directoryService
     ) {
         ApiManager = apiManager;
         ApiClient = apiClient;
@@ -89,6 +102,8 @@ public class EventDispatchService {
         ResolveManager = resolveManager;
         Logger = logger;
         UsageTracker = usageTracker;
+        ProviderManager = providerManager;
+        DirectoryService = directoryService;
         UsageTracker.Stalled += OnStalled;
         ChangesDetectionTimer = new() { AutoReset = true, Interval = TimeSpan.FromSeconds(4).TotalMilliseconds };
         ChangesDetectionTimer.Elapsed += OnIntervalElapsed;
@@ -123,6 +138,8 @@ public class EventDispatchService {
                 ClearFileEvents();
             if (ChangesPerSeries.Count > 0)
                 ClearMetadataUpdatedEvents();
+            if (TakeStructureChanges(force: true) is { } structureChanges)
+                Task.Run(() => ProcessStructureEvents(structureChanges));
         }
     }
 
@@ -166,6 +183,8 @@ public class EventDispatchService {
                     ChangesPerSeries.Remove(metadataId);
             }
         }
+        if (TakeStructureChanges() is { } structureChanges)
+            Task.Run(() => ProcessStructureEvents(structureChanges));
         foreach (var (fileId, changes, trackerId) in filesToProcess) {
             var (allChanges, insertedAt) = TakeUnresolvedFile(fileId, changes);
             Task.Run(() => ProcessFileEvents(fileId, allChanges, trackerId, insertedAt));
@@ -860,6 +879,332 @@ public class EventDispatchService {
             }
         }
         return updateCount;
+    }
+
+    #endregion
+
+    #region Structure Events
+
+    // Fork: events. Daily Shoko servers report group changes, provider link
+    // changes, hidden episodes and custom tag changes. Each can move files
+    // between shows or seasons, or change which shows exist, so the files of
+    // the affected series are linked again and their shows refreshed.
+
+    /// <summary>
+    /// Structure changes gathered until Shoko has been quiet for a moment.
+    /// </summary>
+    private sealed class StructureChanges {
+        public DateTime LastUpdated = DateTime.Now;
+
+        public bool GroupsRecreated;
+
+        /// <summary>
+        /// Groups whose shows need a metadata refresh, such as a renamed group.
+        /// </summary>
+        public readonly HashSet<int> RefreshGroupIds = [];
+
+        /// <summary>
+        /// Groups whose shows need an image refresh.
+        /// </summary>
+        public readonly HashSet<int> ImageGroupIds = [];
+
+        /// <summary>
+        /// Groups whose series' files need linking again, such as the old and
+        /// new group of a moved series.
+        /// </summary>
+        public readonly HashSet<int> RelinkGroupIds = [];
+
+        /// <summary>
+        /// Series whose files need linking again.
+        /// </summary>
+        public readonly HashSet<int> RelinkSeriesIds = [];
+
+        /// <summary>
+        /// Episodes whose series' files need linking again.
+        /// </summary>
+        public readonly HashSet<int> RelinkEpisodeIds = [];
+
+        public required Guid TrackerId { get; init; }
+    }
+
+    private readonly object StructureChangesLock = new();
+
+    private StructureChanges? PendingStructureChanges;
+
+    private void AddStructureChange(string description, Action<StructureChanges> apply) {
+        lock (StructureChangesLock) {
+            PendingStructureChanges ??= new() { TrackerId = Plugin.Instance.Tracker.Add($"Structure event. ({description})") };
+            PendingStructureChanges.LastUpdated = DateTime.Now;
+            apply(PendingStructureChanges);
+        }
+    }
+
+    private StructureChanges? TakeStructureChanges(bool force = false) {
+        lock (StructureChangesLock) {
+            if (PendingStructureChanges is not { } changes)
+                return null;
+            if (!force && DateTime.Now - changes.LastUpdated < DetectChangesThreshold)
+                return null;
+            PendingStructureChanges = null;
+            return changes;
+        }
+    }
+
+    /// <summary>
+    /// A group was added, updated or removed, or its images changed.
+    /// </summary>
+    public void AddGroupEvent(int groupId, UpdateReason reason) {
+        if (groupId <= 0)
+            return;
+
+        switch (reason) {
+            case UpdateReason.MetadataAdded or UpdateReason.MetadataUpdated:
+                AddStructureChange($"Reason=\"{reason}\",Group={groupId}", changes => changes.RefreshGroupIds.Add(groupId));
+                break;
+            case UpdateReason.ImageAdded or UpdateReason.ImageUpdated or UpdateReason.ImageRemoved:
+                AddStructureChange($"Reason=\"{reason}\",Group={groupId}", changes => changes.ImageGroupIds.Add(groupId));
+                break;
+            // Shoko only removes a group once it holds no series, and the
+            // series moved out of it are reported on their own.
+            default:
+                Logger.LogTrace("Skipped group event with {UpdateReason}; no operation. (Group={GroupId})", reason, groupId);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// A series moved from one group to another.
+    /// </summary>
+    public void AddSeriesMovedEvent(int seriesId, int oldGroupId, int newGroupId)
+        => AddStructureChange($"SeriesMoved,Series={seriesId},OldGroup={oldGroupId},NewGroup={newGroupId}", changes => {
+            if (seriesId > 0)
+                changes.RelinkSeriesIds.Add(seriesId);
+            if (oldGroupId > 0)
+                changes.RelinkGroupIds.Add(oldGroupId);
+            if (newGroupId > 0)
+                changes.RelinkGroupIds.Add(newGroupId);
+        });
+
+    /// <summary>
+    /// Shoko recreated every group.
+    /// </summary>
+    public void AddGroupsRecreatedEvent()
+        => AddStructureChange("GroupsRecreated", changes => changes.GroupsRecreated = true);
+
+    /// <summary>
+    /// Something about the given series changed that can change where their
+    /// files belong, such as their provider links or custom tags.
+    /// </summary>
+    public void AddSeriesStructureEvent(IEnumerable<int> seriesIds, string reason) {
+        var ids = seriesIds.Where(id => id > 0).ToList();
+        if (ids.Count is 0)
+            return;
+        AddStructureChange($"Reason=\"{reason}\",Series={string.Join(',', ids)}", changes => changes.RelinkSeriesIds.UnionWith(ids));
+    }
+
+    /// <summary>
+    /// An episode was hidden or shown again.
+    /// </summary>
+    public void AddEpisodeStructureEvent(int episodeId, string reason) {
+        if (episodeId <= 0)
+            return;
+        AddStructureChange($"Reason=\"{reason}\",Episode={episodeId}", changes => changes.RelinkEpisodeIds.Add(episodeId));
+    }
+
+    private async Task<IReadOnlyList<int>> GetSeriesIdsInGroup(int groupId)
+        => (await ApiClient.GetShokoSeriesInGroup(groupId.ToString(), recursive: true))
+            .Select(series => series.IDs.Shoko)
+            .Where(id => id > 0)
+            .ToList();
+
+    private async Task ProcessStructureEvents(StructureChanges changes) {
+        try {
+            if (LibraryScanWatcher.IsScanRunning) {
+                Logger.LogInformation("Skipped processing structure change events because a library scan is running.");
+                return;
+            }
+
+            // Shoko changed how its series are grouped or linked, so any
+            // cached show, season or VFS data may be stale.
+            ApiClient.Clear();
+            ApiManager.Clear();
+
+            if (changes.GroupsRecreated) {
+                ScheduleLibraryCatchUp("Shoko recreated every group");
+                return;
+            }
+
+            var relinkSeriesIds = new HashSet<int>(changes.RelinkSeriesIds);
+            foreach (var groupId in changes.RelinkGroupIds)
+                relinkSeriesIds.UnionWith(await GetSeriesIdsInGroup(groupId));
+            foreach (var episodeId in changes.RelinkEpisodeIds) {
+                if (await ApiClient.GetShokoEpisode(episodeId.ToString()) is { IDs.ParentSeries: > 0 } episode)
+                    relinkSeriesIds.Add(episode.IDs.ParentSeries);
+            }
+
+            var refreshSeriesIds = new HashSet<int>(relinkSeriesIds);
+            foreach (var groupId in changes.RefreshGroupIds)
+                refreshSeriesIds.UnionWith(await GetSeriesIdsInGroup(groupId));
+
+            var imageSeriesIds = new HashSet<int>();
+            foreach (var groupId in changes.ImageGroupIds)
+                imageSeriesIds.UnionWith(await GetSeriesIdsInGroup(groupId));
+
+            Logger.LogInformation(
+                "Processing structure change events… (RelinkSeries={RelinkCount},RefreshSeries={RefreshCount},ImageSeries={ImageCount})",
+                relinkSeriesIds.Count,
+                refreshSeriesIds.Count,
+                imageSeriesIds.Count
+            );
+
+            // Link the files again. File events are only acted on for
+            // libraries with file events enabled.
+            var fileCount = 0;
+            foreach (var seriesId in relinkSeriesIds) {
+                foreach (var file in await ApiClient.GetFilesForShokoSeries(seriesId.ToString())) {
+                    if ((file.Locations.FirstOrDefault(location => location.IsAccessible) ?? file.Locations.FirstOrDefault()) is not { } location)
+                        continue;
+                    var eventArgs = new FileEventArgsStub(location, file);
+                    AddFileEvent(file.Id, UpdateReason.MetadataUpdated, eventArgs.ManagedFolderId, eventArgs.RelativePath, eventArgs);
+                    fileCount++;
+                }
+            }
+
+            // Refresh the shows. Metadata events are only acted on for
+            // libraries with refresh events enabled.
+            var seriesEventCount = 0;
+            if (Plugin.Instance.Configuration.SignalR_EventSources.Contains(ProviderName.Shoko)) {
+                foreach (var seriesId in refreshSeriesIds) {
+                    AddSeriesEvent($"{ProviderName.Shoko}:{seriesId}", CreateShokoSeriesEvent(seriesId, UpdateReason.MetadataUpdated));
+                    seriesEventCount++;
+                }
+                foreach (var seriesId in imageSeriesIds) {
+                    AddSeriesEvent($"{ProviderName.Shoko}:{seriesId}", CreateShokoSeriesEvent(seriesId, UpdateReason.ImageUpdated));
+                    seriesEventCount++;
+                }
+            }
+            else if (refreshSeriesIds.Count > 0 || imageSeriesIds.Count > 0) {
+                Logger.LogDebug("Skipped refreshing shows for structure change events because the Shoko event source is not enabled in the plugin settings.");
+            }
+
+            Logger.LogInformation("Queued {FileCount} file events and {SeriesCount} series events for structure change events.", fileCount, seriesEventCount);
+        }
+        catch (Exception ex) {
+            Logger.LogError(ex, "Error processing structure change events.");
+        }
+        finally {
+            Plugin.Instance.Tracker.Remove(changes.TrackerId);
+        }
+    }
+
+    private static SeriesInfoUpdatedEventArgs CreateShokoSeriesEvent(int seriesId, UpdateReason reason)
+        => new() {
+            Reason = reason,
+            ProviderName = ProviderName.Shoko,
+            ProviderId = seriesId.ToString(),
+            SeriesIds = [seriesId],
+        };
+
+    #endregion
+
+    #region Library Catch-up
+
+    // Fork: events. Shoko does not replay the events it sent while we were
+    // not listening, so after a lost connection (and optionally on an
+    // interval) the libraries we manage are scanned to catch up.
+
+    /// <summary>
+    /// How long to wait after the last request before scanning, so a
+    /// flapping connection only scans once.
+    /// </summary>
+    private static readonly TimeSpan CatchUpDelay = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The least time between two catch-up scans.
+    /// </summary>
+    private static readonly TimeSpan CatchUpMinimumInterval = TimeSpan.FromMinutes(10);
+
+    private readonly object CatchUpLock = new();
+
+    private System.Threading.CancellationTokenSource? CatchUpCancellation;
+
+    private DateTime LastCatchUp = DateTime.MinValue;
+
+    /// <summary>
+    /// Schedules a scan of the libraries with file or refresh events enabled.
+    /// Requests that come in before it starts are merged into one scan.
+    /// </summary>
+    /// <param name="reason">Why the scan is needed, for the logs.</param>
+    public void ScheduleLibraryCatchUp(string reason) {
+        lock (CatchUpLock) {
+            CatchUpCancellation?.Cancel();
+            var cancellation = CatchUpCancellation = new();
+            var delay = LastCatchUp + CatchUpMinimumInterval - DateTime.Now;
+            if (delay < CatchUpDelay)
+                delay = CatchUpDelay;
+            Logger.LogInformation("Scheduled a library scan to catch up with Shoko in {Delay}. (Reason={Reason})", delay, reason);
+            _ = Task.Run(async () => {
+                try {
+                    await Task.Delay(delay, cancellation.Token);
+                }
+                catch (OperationCanceledException) {
+                    return;
+                }
+                await RunLibraryCatchUp(reason);
+            });
+        }
+    }
+
+    private async Task RunLibraryCatchUp(string reason) {
+        try {
+            if (LibraryScanWatcher.IsScanRunning) {
+                Logger.LogInformation("Skipped the library catch-up scan because a library scan is already running. (Reason={Reason})", reason);
+                return;
+            }
+
+            var libraries = await ConfigurationService.GetAvailableMediaFoldersForLibraries(c => !c.IsIgnored && (c.Library.IsFileEventsEnabled || c.Library.IsRefreshEventsEnabled));
+            var collectionFolders = libraries
+                .SelectMany(tuple => tuple.mediaList)
+                .Select(mediaFolder => mediaFolder.LibraryId)
+                .Distinct()
+                .Select(libraryId => LibraryManager.GetItemById(libraryId) as CollectionFolder)
+                .WhereNotNull()
+                .DistinctBy(folder => folder.Id)
+                .ToList();
+            if (collectionFolders.Count is 0) {
+                Logger.LogDebug("Skipped the library catch-up scan because no libraries have file or refresh events enabled. (Reason={Reason})", reason);
+                return;
+            }
+
+            lock (CatchUpLock)
+                LastCatchUp = DateTime.Now;
+
+            // Read everything fresh from Shoko, and let the VFS be generated
+            // again.
+            ApiClient.Clear();
+            ApiManager.Clear();
+            ResolveManager.Clear();
+
+            foreach (var folder in collectionFolders) {
+                Logger.LogInformation("Scanning library {LibraryName} to catch up with Shoko. (Library={LibraryId},Reason={Reason})", folder.Name, folder.Id, reason);
+                ProviderManager.QueueRefresh(
+                    folder.Id,
+                    // Jellyfin validates the children of a refreshed collection
+                    // folder, which regenerates the VFS and finds new and
+                    // removed items.
+                    new MetadataRefreshOptions(DirectoryService) {
+                        MetadataRefreshMode = MetadataRefreshMode.Default,
+                        ImageRefreshMode = MetadataRefreshMode.Default,
+                        ReplaceAllMetadata = false,
+                        ReplaceAllImages = false,
+                    },
+                    RefreshPriority.Normal
+                );
+            }
+        }
+        catch (Exception ex) {
+            Logger.LogError(ex, "Error scheduling the library catch-up scan. (Reason={Reason})", reason);
+        }
     }
 
     #endregion

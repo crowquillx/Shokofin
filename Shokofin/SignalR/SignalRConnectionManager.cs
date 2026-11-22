@@ -19,7 +19,8 @@ using Shokofin.Utils;
 namespace Shokofin.SignalR;
 
 public class SignalRConnectionManager {
-    private const string HubUrl = "/signalr/aggregate?feeds=shoko,metadata,file,release";
+    // Fork: events. The group feed is only on daily servers; others skip it.
+    private const string HubUrl = "/signalr/aggregate?feeds=shoko,metadata,file,release,group";
 
     private readonly ILogger<SignalRConnectionManager> Logger;
 
@@ -34,6 +35,14 @@ public class SignalRConnectionManager {
     private HubConnection? Connection = null;
 
     private string CachedKey = string.Empty;
+
+    /// <summary>
+    /// Set when the connection was lost, so the next successful connection
+    /// catches up on what was missed.
+    /// </summary>
+    private bool HasLostConnection = false;
+
+    private System.Threading.Timer? PeriodicCatchUpTimer = null;
 
 #pragma warning disable CA1822
     public bool IsUsable => CanConnect(Plugin.Instance.Configuration);
@@ -89,12 +98,37 @@ public class SignalRConnectionManager {
             connection.On<MovieInfoUpdatedEventArgs>("metadata:movie.updated", OnInfoUpdated);
             connection.On<MovieInfoUpdatedEventArgs>("metadata:movie.removed", OnInfoUpdated);
 
+            // Fork: events. Daily servers name image events after their
+            // reason. Older daily servers sent them in lower case.
+            foreach (var (suffix, reason) in DailyImageEventSuffixes) {
+                connection.On<EpisodeInfoUpdatedEventArgs>($"metadata:episode.{suffix}", e => OnInfoUpdated(WithReason(e, reason)));
+                connection.On<SeriesInfoUpdatedEventArgs>($"metadata:series.{suffix}", e => OnInfoUpdated(WithReason(e, reason)));
+                connection.On<MovieInfoUpdatedEventArgs>($"metadata:movie.{suffix}", e => OnInfoUpdated(WithReason(e, reason)));
+            }
+
+            // Fork: events. Changes that can move files between shows.
+            connection.On<MetadataLinksChangedEventArgs>("metadata:links.changed", OnLinksChanged);
+            connection.On<EpisodeHiddenChangedEventArgs>("metadata:episode.hiddenChanged", OnEpisodeHiddenChanged);
+            connection.On<SeriesCustomTagsChangedEventArgs>("metadata:series.customTagsChanged", OnSeriesCustomTagsChanged);
+
             // Attach release events.
             connection.On<ReleaseSavedEventArgs>("release:saved", OnReleaseSaved);
+            // Fork: events. release:removed was release:deleted on earlier daily servers.
+            connection.On<FileIdEventArgs>("release:removed", OnReleaseRemoved);
+            connection.On<FileIdEventArgs>("release:deleted", OnReleaseRemoved);
 
             // Attach file events.
             connection.On<FileEventArgs>("file:deleted", OnFileDeleted);
             connection.On<FileMovedEventArgs>("file:relocated", OnFileRelocated);
+            // Fork: events.
+            connection.On<FileEventArgs>("file:hashed", OnFileHashed);
+            connection.On<FileIdEventArgs>("file:updated", OnFileUpdated);
+
+            // Fork: events. Attach group events.
+            foreach (var (suffix, reason) in DailyGroupEventSuffixes)
+                connection.On<GroupInfoUpdatedEventArgs>($"group:group.{suffix}", e => OnGroupUpdated(e, reason));
+            connection.On<SeriesMovedEventArgs>("group:series.moved", OnSeriesMoved);
+            connection.On("group:recreated", OnGroupsRecreated);
         }
         else {
             // Attach refresh events.
@@ -107,6 +141,9 @@ public class SignalRConnectionManager {
             connection.On<FileEventArgs>("ShokoEvent:FileDeleted", OnFileDeleted);
             connection.On<FileMovedEventArgs>("ShokoEvent:FileMoved", OnFileRelocated);
             connection.On<FileRenamedEventArgs>("ShokoEvent:FileRenamed", OnFileRelocated);
+            // Fork: events.
+            connection.On<FileEventArgs>("ShokoEvent:FileHashed", OnFileHashed);
+            connection.On<FileEventArgs>("ShokoEvent:FileNotMatched", OnFileNotMatched);
         }
 
         EventSubmitterLease = Events.RegisterEventSubmitter();
@@ -116,6 +153,13 @@ public class SignalRConnectionManager {
             await connection.StartAsync();
 
             Logger.LogInformation("Connected to Shoko Server.");
+
+            ResetPeriodicCatchUpTimer(config);
+            if (HasLostConnection) {
+                HasLostConnection = false;
+                if (config.SignalR_CatchUpOnReconnect)
+                    Events.ScheduleLibraryCatchUp("Connected again after losing the connection");
+            }
         }
         catch (HttpRequestException ex) when (ex is { HttpRequestError: HttpRequestError.ConnectionError, InnerException: SocketException { SocketErrorCode: SocketError.ConnectionRefused } }) {
             Logger.LogWarning("Unable to connect to Shoko Server due to a connection error. Please reconnect manually.");
@@ -129,22 +173,54 @@ public class SignalRConnectionManager {
 
     private Task OnReconnected(string? connectionId) {
         Logger.LogInformation("Reconnected to Shoko Server. (Connection={ConnectionId})", connectionId);
+
+        // Fork: events. Shoko doesn't replay the events we missed.
+        HasLostConnection = false;
+        if (Plugin.Instance.Configuration.SignalR_CatchUpOnReconnect)
+            Events.ScheduleLibraryCatchUp("Reconnected to Shoko Server");
         return Task.CompletedTask;
     }
 
     private Task OnReconnecting(Exception? exception) {
         Logger.LogWarning(exception, "Disconnected from Shoko Server. Attempting to reconnect…");
+        HasLostConnection = true;
         return Task.CompletedTask;
     }
 
     private Task OnDisconnected(Exception? exception) {
         // Graceful disconnection.
-        if (exception == null)
+        if (exception == null) {
             Logger.LogInformation("Gracefully disconnected from Shoko Server.");
-        else
+        }
+        else {
             Logger.LogWarning(exception, "Abruptly disconnected from Shoko Server.");
+            HasLostConnection = true;
+        }
         return Task.CompletedTask;
     }
+
+    #region Periodic Catch-up
+
+    // Fork: events.
+
+    private void ResetPeriodicCatchUpTimer(PluginConfiguration config) {
+        PeriodicCatchUpTimer?.Dispose();
+        PeriodicCatchUpTimer = null;
+        if (Connection is null || config.SignalR_PeriodicCatchUpIntervalInHours <= 0)
+            return;
+
+        var interval = TimeSpan.FromHours(config.SignalR_PeriodicCatchUpIntervalInHours);
+        PeriodicCatchUpTimer = new(OnPeriodicCatchUp, null, interval, interval);
+        Logger.LogDebug("Scheduled a periodic library catch-up scan every {Interval}.", interval);
+    }
+
+    private void OnPeriodicCatchUp(object? state) {
+        if (State is not HubConnectionState.Connected)
+            return;
+        Events.ScheduleLibraryCatchUp("Periodic catch-up");
+    }
+
+    #endregion
 
     public async Task DisconnectAsync() {
         if (Connection == null)
@@ -152,6 +228,9 @@ public class SignalRConnectionManager {
 
         var connection = Connection;
         Connection = null;
+
+        PeriodicCatchUpTimer?.Dispose();
+        PeriodicCatchUpTimer = null;
 
         if (connection.State != HubConnectionState.Disconnected)
             await connection.StopAsync();
@@ -195,6 +274,9 @@ public class SignalRConnectionManager {
             Logger.LogDebug("Detected change in SignalR configuration! (Config={Config})", currentKey);
             CachedKey = currentKey;
             ResetConnection(config, Connection != null);
+        }
+        else if (Connection is not null) {
+            ResetPeriodicCatchUpTimer(config);
         }
     }
 
@@ -290,6 +372,97 @@ public class SignalRConnectionManager {
         Events.AddFileEvent(eventArgs.FileId, UpdateReason.MetadataAdded, eventArgs.ManagedFolderId, eventArgs.RelativePath, eventArgs);
     }
 
+    // Fork: events.
+    private void OnFileHashed(IFileEventArgs eventArgs) {
+        // A new file is matched later, and that event covers it. A file whose
+        // contents Shoko already knew, such as one removed and added back,
+        // keeps its stored release and gets no other event, so act on hashed
+        // files that already have episodes.
+        if (!eventArgs.HasCrossReferences || eventArgs.CrossReferences.Count is 0) {
+            Logger.LogTrace(
+                "File hashed without cross-references; skipped. (File={FileId},Location={LocationId})",
+                eventArgs.FileId,
+                eventArgs.FileLocationId
+            );
+            return;
+        }
+
+        Logger.LogDebug(
+            "File hashed with known cross-references; {ManagedFolderId} {Path} (File={FileId},Location={LocationId})",
+            eventArgs.ManagedFolderId,
+            eventArgs.RelativePath,
+            eventArgs.FileId,
+            eventArgs.FileLocationId
+        );
+        OnFileMatched(eventArgs);
+    }
+
+    // Fork: events.
+    private void OnFileNotMatched(IFileEventArgs eventArgs) {
+        Logger.LogDebug(
+            "File not matched; {ManagedFolderId} {Path} (File={FileId},Location={LocationId})",
+            eventArgs.ManagedFolderId,
+            eventArgs.RelativePath,
+            eventArgs.FileId,
+            eventArgs.FileLocationId
+        );
+        OnFileMatched(eventArgs);
+    }
+
+    // Fork: events.
+    private Task OnReleaseRemoved(FileIdEventArgs eventArgs) {
+        if (eventArgs.FileId is not > 0) {
+            Logger.LogDebug("Release removed without a file; skipped.");
+            return Task.CompletedTask;
+        }
+
+        // The file keeps existing but loses its episodes, so reading it again
+        // removes its links.
+        return EmitFileEventForFileId(eventArgs.FileId.Value, "Release removed");
+    }
+
+    // Fork: events. Sent when a file is marked ignored or as a variation.
+    private Task OnFileUpdated(FileIdEventArgs eventArgs) {
+        if (eventArgs.FileId is not > 0)
+            return Task.CompletedTask;
+        return EmitFileEventForFileId(eventArgs.FileId.Value, "File updated");
+    }
+
+    // Fork: events.
+    private async Task EmitFileEventForFileId(int fileId, string description) {
+        if (await ApiClient.GetFile(fileId.ToString(), refreshCache: true) is not { } file) {
+            Logger.LogDebug("{Description}; file not found. (File={FileId})", description, fileId);
+            return;
+        }
+
+        if ((file.Locations.FirstOrDefault(location => location.IsAccessible) ?? file.Locations.FirstOrDefault()) is not { } fileLocation) {
+            Logger.LogDebug("{Description}; file location not found. (File={FileId})", description, fileId);
+            return;
+        }
+
+        var eventArgs = new FileEventArgsStub(fileLocation, file);
+        Logger.LogDebug(
+            "{Description}; {ManagedFolderId} {Path} (File={FileId},Location={LocationId},CrossReferences={CrossReferenceCount})",
+            description,
+            eventArgs.ManagedFolderId,
+            eventArgs.RelativePath,
+            eventArgs.FileId,
+            eventArgs.FileLocationId,
+            eventArgs.CrossReferences.Count
+        );
+
+        if (LibraryScanWatcher.IsScanRunning) {
+            Logger.LogTrace(
+                "Library scan is running. Skipping emit of file event. (File={FileId},Location={LocationId})",
+                eventArgs.FileId,
+                eventArgs.FileLocationId
+            );
+            return;
+        }
+
+        Events.AddFileEvent(eventArgs.FileId, UpdateReason.MetadataUpdated, eventArgs.ManagedFolderId, eventArgs.RelativePath, eventArgs);
+    }
+
     private void OnFileDeleted(IFileEventArgs eventArgs) {
         Logger.LogDebug(
             "File deleted; {ManagedFolderId} {Path} (File={FileId},Location={LocationId},CrossReferences={HasCrossReferences})",
@@ -367,6 +540,100 @@ public class SignalRConnectionManager {
 
         if (eventArgs.Kind is BaseItemKind.Episode or BaseItemKind.Series or BaseItemKind.Movie)
             Events.AddSeriesEvent(eventArgs.ProviderParentUId ?? eventArgs.ProviderUId, eventArgs);
+    }
+
+    #endregion
+
+    #region Structure Events
+
+    // Fork: events. Daily-only events that can change which show or season a
+    // file belongs to.
+
+    private static readonly (string Suffix, UpdateReason Reason)[] DailyImageEventSuffixes = [
+        ("imageAdded", UpdateReason.ImageAdded),
+        ("imageUpdated", UpdateReason.ImageUpdated),
+        ("imageRemoved", UpdateReason.ImageRemoved),
+        ("imageadded", UpdateReason.ImageAdded),
+        ("imageupdated", UpdateReason.ImageUpdated),
+        ("imageremoved", UpdateReason.ImageRemoved),
+    ];
+
+    private static readonly (string Suffix, UpdateReason Reason)[] DailyGroupEventSuffixes = [
+        ("added", UpdateReason.MetadataAdded),
+        ("updated", UpdateReason.MetadataUpdated),
+        ("removed", UpdateReason.MetadataRemoved),
+        ..DailyImageEventSuffixes,
+    ];
+
+    /// <summary>
+    /// Daily servers put the reason in the event name. Trust the name when
+    /// the payload's reason isn't an image reason.
+    /// </summary>
+    private static T WithReason<T>(T eventArgs, UpdateReason reason) where T : IMetadataUpdatedEventArgs {
+        if (eventArgs.IsImageUpdate)
+            return eventArgs;
+        switch (eventArgs) {
+            case EpisodeInfoUpdatedEventArgs episodeArgs:
+                episodeArgs.Reason = reason;
+                break;
+            case SeriesInfoUpdatedEventArgs seriesArgs:
+                seriesArgs.Reason = reason;
+                break;
+            case MovieInfoUpdatedEventArgs movieArgs:
+                movieArgs.Reason = reason;
+                break;
+        }
+        return eventArgs;
+    }
+
+    private bool ShouldSkipStructureEvent(string description) {
+        if (LibraryScanWatcher.IsScanRunning) {
+            Logger.LogTrace("Library scan is running. Skipping emit of structure event. ({Description})", description);
+            return true;
+        }
+        return false;
+    }
+
+    private void OnGroupUpdated(GroupInfoUpdatedEventArgs eventArgs, UpdateReason reason) {
+        Logger.LogDebug("Group event with {UpdateReason}. (Group={GroupId})", reason, eventArgs.GroupId);
+        if (ShouldSkipStructureEvent($"Group={eventArgs.GroupId}"))
+            return;
+        Events.AddGroupEvent(eventArgs.GroupId, reason);
+    }
+
+    private void OnSeriesMoved(SeriesMovedEventArgs eventArgs) {
+        Logger.LogDebug("Series moved to another group. (Series={SeriesId},OldGroup={OldGroupId},NewGroup={NewGroupId})", eventArgs.SeriesId, eventArgs.OldGroupId, eventArgs.NewGroupId);
+        if (ShouldSkipStructureEvent($"Series={eventArgs.SeriesId}"))
+            return;
+        Events.AddSeriesMovedEvent(eventArgs.SeriesId, eventArgs.OldGroupId, eventArgs.NewGroupId);
+    }
+
+    private void OnGroupsRecreated() {
+        Logger.LogInformation("Shoko Server recreated every group.");
+        if (ShouldSkipStructureEvent("GroupsRecreated"))
+            return;
+        Events.AddGroupsRecreatedEvent();
+    }
+
+    private void OnLinksChanged(MetadataLinksChangedEventArgs eventArgs) {
+        Logger.LogDebug("Provider links changed. (Series={SeriesIds})", eventArgs.SeriesIds);
+        if (ShouldSkipStructureEvent("LinksChanged"))
+            return;
+        Events.AddSeriesStructureEvent(eventArgs.SeriesIds, "Links changed");
+    }
+
+    private void OnEpisodeHiddenChanged(EpisodeHiddenChangedEventArgs eventArgs) {
+        Logger.LogDebug("Episode hidden changed. (Episode={EpisodeId},IsHidden={IsHidden})", eventArgs.ShokoEpisodeId, eventArgs.IsHidden);
+        if (eventArgs.ShokoEpisodeId is not > 0 || ShouldSkipStructureEvent($"Episode={eventArgs.ShokoEpisodeId}"))
+            return;
+        Events.AddEpisodeStructureEvent(eventArgs.ShokoEpisodeId.Value, eventArgs.IsHidden ? "Episode hidden" : "Episode shown");
+    }
+
+    private void OnSeriesCustomTagsChanged(SeriesCustomTagsChangedEventArgs eventArgs) {
+        Logger.LogDebug("Series custom tags changed. (Series={SeriesId})", eventArgs.SeriesId);
+        if (ShouldSkipStructureEvent($"Series={eventArgs.SeriesId}"))
+            return;
+        Events.AddSeriesStructureEvent([eventArgs.SeriesId], "Custom tags changed");
     }
 
     #endregion

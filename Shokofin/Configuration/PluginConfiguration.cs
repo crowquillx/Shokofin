@@ -772,6 +772,23 @@ public class PluginConfiguration : BasePluginConfiguration {
     /// </summary>
     public ProviderName[] SignalR_EventSources { get; set; }
 
+    // Fork: events
+
+    /// <summary>
+    /// Scan the libraries with file or refresh events enabled after the
+    /// connection to Shoko is lost and comes back, since Shoko does not replay
+    /// the events sent while we were not listening.
+    /// </summary>
+    public bool SignalR_CatchUpOnReconnect { get; set; } = true;
+
+    /// <summary>
+    /// Also scan those libraries on this interval while connected, to pick up
+    /// changes Shoko sends no event for. 0 turns it off.
+    /// </summary>
+    public int SignalR_PeriodicCatchUpIntervalInHours { get; set; } = 0;
+
+    // End fork: events
+
     #endregion
 
     #region Season Merging

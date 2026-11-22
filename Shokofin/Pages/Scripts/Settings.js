@@ -733,6 +733,11 @@ function applyFormToConfig(form, config) {
             config.SignalR_AutoReconnectInSeconds = reconnectIntervals;
             form.querySelector("#SignalRAutoReconnectIntervals").value = reconnectIntervals.join(", ");
             config.SignalR_EventSources = retrieveCheckboxList(form, "SignalREventSources");
+            // Fork: events
+            config.SignalR_CatchUpOnReconnect = form.querySelector("#SignalRCatchUpOnReconnect").checked;
+            config.SignalR_PeriodicCatchUpIntervalInHours = Math.max(0, parseInt(form.querySelector("#SignalRPeriodicCatchUpInterval").value, 10) || 0);
+            form.querySelector("#SignalRPeriodicCatchUpInterval").value = config.SignalR_PeriodicCatchUpIntervalInHours.toString();
+            // End fork: events
 
             config.SignalR_FileEvents = form.querySelector("#SignalRDefaultFileEvents").checked;
             config.SignalR_RefreshEnabled = form.querySelector("#SignalRDefaultRefreshEvents").checked;
@@ -985,6 +990,10 @@ async function applyConfigToForm(form, config) {
             form.querySelector("#SignalRAutoConnect").checked = config.SignalR_AutoConnectEnabled;
             form.querySelector("#SignalRAutoReconnectIntervals").value = config.SignalR_AutoReconnectInSeconds.join(", ");
             renderCheckboxList(form, "SignalREventSources", config.SignalR_EventSources);
+            // Fork: events
+            form.querySelector("#SignalRCatchUpOnReconnect").checked = config.SignalR_CatchUpOnReconnect;
+            form.querySelector("#SignalRPeriodicCatchUpInterval").value = (config.SignalR_PeriodicCatchUpIntervalInHours ?? 0).toString();
+            // End fork: events
 
             form.querySelector("#SignalRDefaultFileEvents").checked = config.SignalR_FileEvents;
             form.querySelector("#SignalRDefaultRefreshEvents").checked = config.SignalR_RefreshEnabled;
