@@ -52,6 +52,33 @@ public class ShokofinHostController(ILogger<ShokofinHostController> logger, Shok
         }
     }
 
+    /// <summary>
+    /// Get the Shoko user the API key belongs to, and a warning when Shoko
+    /// hides tags from it.
+    /// </summary>
+    [HttpGet("User")]
+    public async Task<ActionResult<ShokoUserStatus>> GetUserAsync() {
+        try {
+            var user = await APIClient.GetCurrentUser();
+            if (user is null)
+                return StatusCode(StatusCodes.Status404NotFound);
+
+            var warning = ShokoApiClient.GetRestrictedTagsWarning(user);
+            if (warning is not null)
+                Logger.LogWarning("{Warning} (User={UserId})", warning, user.ID);
+            return new ShokoUserStatus {
+                Username = user.Username,
+                IsAdmin = user.IsAdmin,
+                RestrictedTagCount = user.RestrictedTags.Count,
+                Warning = warning,
+            };
+        }
+        catch (Exception ex) {
+            Logger.LogDebug(ex, "Failed to get the Shoko user for the API key. Exception; {ex}", ex.Message);
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
+    }
+
     [HttpPost("GetApiKey")]
     public async Task<ActionResult<ApiKey>> GetApiKeyAsync([FromBody] ApiLoginRequest body) {
         try {
@@ -132,4 +159,18 @@ public class ApiLoginRequest {
     /// </summary>
     [JsonPropertyName("userKey")]
     public bool UserKey { get; set; } = false;
+}
+
+public class ShokoUserStatus {
+    [JsonPropertyName("Username")]
+    public string Username { get; set; } = string.Empty;
+
+    [JsonPropertyName("IsAdmin")]
+    public bool IsAdmin { get; set; }
+
+    [JsonPropertyName("RestrictedTagCount")]
+    public int RestrictedTagCount { get; set; }
+
+    [JsonPropertyName("Warning")]
+    public string? Warning { get; set; }
 }

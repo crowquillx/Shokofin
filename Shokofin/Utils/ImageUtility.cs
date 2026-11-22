@@ -184,6 +184,37 @@ public static class ImageUtility {
 
     #endregion
 
+    #region Fork: Season Posters
+
+    /// <summary>
+    /// Put a poster chosen with the Season Posters Shoko plugin first among
+    /// the primary images, so an automatic image search picks it.
+    /// </summary>
+    public static IReadOnlyCollection<RemoteImageInfo> WithOverridePoster(IReadOnlyCollection<RemoteImageInfo> images, Guid? imageId, string? metadataLanguage, bool displayMode) {
+        if (imageId is not { } id)
+            return images;
+
+        var image = new API.Models.Image { Source = "Shoko", Type = "Poster", UID = id, IsMaybeAvailable = true };
+        var url = image.ToURLString();
+        var remoteImage = new RemoteImageInfo {
+            ProviderName = $"Season Posters ({Plugin.MetadataProviderName})",
+            Type = ImageType.Primary,
+            Url = url,
+        };
+        if (!displayMode) {
+            // Rank above every image ProcessImages ranks.
+            var rank = Over9K + images.Count + 1;
+            remoteImage.Language = string.IsNullOrWhiteSpace(metadataLanguage) ? "en" : metadataLanguage;
+            remoteImage.CommunityRating = rank;
+            remoteImage.VoteCount = rank;
+            remoteImage.RatingType = RatingType.Score;
+        }
+
+        return [remoteImage, ..images.Where(other => other.Url != url)];
+    }
+
+    #endregion
+
     #region Process Images
 
     private const int Over9K = 9001;

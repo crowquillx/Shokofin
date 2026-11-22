@@ -867,6 +867,18 @@ public class PluginConfiguration : BasePluginConfiguration {
 
     #endregion
 
+    // Fork: posters
+    #region Fork: Season Posters
+
+    /// <summary>
+    /// Use the show and specials posters chosen with the Season Posters Shoko
+    /// plugin for shows built from Shoko groups. Does nothing when that
+    /// plugin is not installed in Shoko.
+    /// </summary>
+    public bool SeasonPosters_Enabled { get; set; } = true;
+
+    #endregion
+
     public PluginConfiguration() {
         Url = "http://127.0.0.1:8111";
         PublicUrl = string.Empty;

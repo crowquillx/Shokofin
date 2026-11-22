@@ -455,6 +455,8 @@ async function updateView(view, form, config) {
                 form.querySelector("#ServerVersion").value = "Version N/A";
             }
 
+            updateShokoUserWarning(form, State.connected); // Fork: posters
+
             if (State.connected) {
                 form.querySelector("#Url").removeAttribute("required");
                 form.querySelector("#Username").removeAttribute("required");
@@ -575,6 +577,43 @@ function updateSignalrStatus(form, status) {
 
 //#region Form → Configuration
 
+//#region Fork: posters (restricted tags warning)
+
+/**
+ * Show a warning on the connection tab when Shoko hides tags from the user the
+ * API key belongs to, since every series with one of those tags is then
+ * missing from Jellyfin.
+ *
+ * @param {HTMLFormElement} form - The form element.
+ * @param {boolean} connected - Whether the plugin is connected to Shoko.
+ */
+async function updateShokoUserWarning(form, connected) {
+    const element = form.querySelector("#ShokoUserWarning");
+    if (!element)
+        return;
+    element.setAttribute("hidden", "");
+    element.textContent = "";
+    if (!connected)
+        return;
+    try {
+        /** @type {{ Username: string; IsAdmin: boolean; RestrictedTagCount: number; Warning: string | null; }} */
+        const user = await ApiClient.fetch({
+            dataType: "json",
+            type: "GET",
+            url: ApiClient.getUrl("Shokofin/Host/User"),
+        });
+        if (user && user.Warning) {
+            element.textContent = user.Warning;
+            element.removeAttribute("hidden");
+        }
+    }
+    catch (err) {
+        console.debug("Shokofin: unable to check the Shoko user for restricted tags.", err);
+    }
+}
+
+//#endregion
+
 /**
  * Apply a form to a configuration object.
  *
@@ -612,6 +651,7 @@ function applyFormToConfig(form, config) {
 
             config.Image.DebugMode = form.querySelector("#Image_DebugMode").checked;
             applyImageFormToConfig(form, config);
+            config.SeasonPosters_Enabled = form.querySelector("#SeasonPosters_Enabled").checked; // Fork: posters
 
             config.Metadata_StudioOnlyAnimationWorks = form.querySelector("#Metadata_StudioOnlyAnimationWorks").checked;
             ([config.ContentRatingList, config.ContentRatingOrder] = retrieveSortableCheckboxList(form, "Metadata_ContentRatingList"));
@@ -912,6 +952,7 @@ async function applyConfigToForm(form, config) {
             renderSortableCheckboxList(form, "Image_LogoList", config.Image[State.metadata.image].LogoList, config.Image[State.metadata.image].LogoOrder);
             renderSortableCheckboxList(form, "Image_BackdropList", config.Image[State.metadata.image].BackdropList, config.Image[State.metadata.image].BackdropOrder);
             form.querySelector("#Image_DebugMode").checked = config.Image.DebugMode;
+            form.querySelector("#SeasonPosters_Enabled").checked = config.SeasonPosters_Enabled !== false; // Fork: posters
 
             form.querySelector("#Metadata_StudioOnlyAnimationWorks").checked = config.Metadata_StudioOnlyAnimationWorks;
             renderSortableCheckboxList(form, "Metadata_ContentRatingList", config.ContentRatingList, config.ContentRatingOrder);
