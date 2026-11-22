@@ -85,7 +85,7 @@ public static partial class TextUtility {
     private static readonly Regex SynopsisConvertNewLines = new(@"\r\n|\r", RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex SynopsisCleanMultiEmptyLines = new(@"\n{2,}", RegexOptions.Singleline | RegexOptions.Compiled);
 
-    [GeneratedRegex(@"^(?:Special|Episode|Volume|OVA|OAD|Web) \d+$|^Part \d+ of \d+$|^Episode [COPRST]\d+$|^(?:OVA|OAD|Movie|Complete Movie|Short Movie|TV Special|Music Video|Web|Volume)$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    [GeneratedRegex(@"^(?:Special|Episode|Volume|OVA|OAD|Web) \d+(?:\.\d+)?$|^Part \d+ of \d+$|^Episode [COPRST]\d+$|^(?:OVA|OAD|Movie|Complete Movie|Short Movie|TV Special|Music Video|Web|Volume)$|^\s*(?:TBA|TBD|To be announced)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex InvalidEpisodeTitleRegex();
 
     // Currently copied from these two locations until I have more time to research if there are even more patterns across languages to support;
@@ -469,7 +469,14 @@ public static partial class TextUtility {
     private static string? GetEpisodeTitleByType(EpisodeInfo episodeInfo, SeasonInfo seasonInfo, TitleConfiguration configuration, string? metadataLanguage) {
         var anidbTitles = new Lazy<IReadOnlyList<Title>>(() => episodeInfo.Titles.Where(t => t.Source is "AniDB").ToList());
         var tmdbTitles = new Lazy<IReadOnlyList<Title>>(() => episodeInfo.Titles.Where(t => t.Source is "TMDB").ToList());
+        // Fork: titles — a name Shoko made up is only used when no provider
+        // has a real title.
+        string? synthesizedTitle = null;
         foreach (var provider in configuration.GetOrderedTitleProviders()) {
+            if (provider is TitleProvider.Shoko_Default && episodeInfo.IsTitleSynthesized) {
+                synthesizedTitle ??= episodeInfo.Title;
+                continue;
+            }
             var title = provider switch {
                 TitleProvider.Shoko_Default =>
                     episodeInfo.Title,
@@ -490,6 +497,9 @@ public static partial class TextUtility {
             if (!string.IsNullOrEmpty(title) && !InvalidEpisodeTitleRegex().IsMatch(title))
                 return title.Trim();
         }
+
+        if (!string.IsNullOrWhiteSpace(synthesizedTitle) && !InvalidEpisodeTitleRegex().IsMatch(synthesizedTitle))
+            return synthesizedTitle.Trim();
 
         return null;
     }

@@ -22,6 +22,12 @@ public class ShokoEpisode {
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
+    /// Indicates a Shoko user gave the episode its name. Only sent by daily
+    /// (6.x) servers.
+    /// </summary>
+    public bool HasCustomName { get; set; }
+
+    /// <summary>
     /// The preferred description of the episode based on the selected episode
     /// language settings on the server.
     /// </summary>
