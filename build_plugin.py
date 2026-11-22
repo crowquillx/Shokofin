@@ -98,7 +98,7 @@ try:
             generated_version = f"{short_version}.{build_number}{target_abi_low}"
         else:
             generated_version = f"{short_version}.{target_abi_low}"
-        generated_changelog = f"Only compatible with **{target_abi_high}**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/{tag}) for more info."
+        generated_changelog = f"Only compatible with **{target_abi_high}**.\n\nSee the [release notes](https://github.com/{opts.repo}/releases/tag/{tag}) for more info."
         if changelog:
             generated_changelog += f"\n\n---\n\n{changelog}"
 

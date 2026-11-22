@@ -1,4 +1,28 @@
-# Shokofin
+# Shokofin (personal fork)
+
+> [!WARNING]
+> **This is a personal fork of [ShokoAnime/Shokofin](https://github.com/ShokoAnime/Shokofin).**
+> It may not be maintained, may fall behind upstream, and its extra features are
+> not well-tested. For the supported plugin, use the official repository. Please
+> do not report problems with this fork to the Shokofin developers.
+
+## Installing this fork
+
+Add this repository in Jellyfin under **Dashboard → Plugins → Repositories**,
+and remove the official Shokofin repository first. Both use the same plugin ID,
+so with both added Jellyfin installs whichever offers the higher version.
+
+- Dev builds: `https://raw.githubusercontent.com/crowquillx/Shokofin/metadata/dev/manifest.json`
+
+Fork builds are versioned `6.1.x` and up, so they replace an installed official
+`6.0.x` build and keep its settings.
+
+## What this fork adds
+
+FORK_FEATURES_PLACEHOLDER
+
+---
+
 
 A Jellyfin plugin to integrate [Jellyfin](https://jellyfin.org/) with
 [Shoko Server](https://shokoanime.com/downloads/shoko-server).
