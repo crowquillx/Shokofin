@@ -2,92 +2,11 @@
     {
         "guid": "5216ccbf-d24a-4eb3-8a7e-7da4230b7052",
         "name": "Shoko",
-        "description": "A Jellyfin plugin to integrate [Jellyfin](https://jellyfin.org/docs/) with [Shoko Server](https://shokoanime.com/downloads/shoko-server/).\n## Read this before installing\n**This plugin requires that you have already set up and are using Shoko Server**, and that the files you intend to include in Jellyfin are **indexed** (and optionally managed) by Shoko Server. **Otherwise, the plugin won't be able to provide metadata for your files**, since there is no metadata to find for them.\n",
-        "overview": "Manage your anime from Jellyfin using metadata from Shoko",
-        "owner": "ShokoAnime",
+        "description": "Personal fork of Shokofin (https://github.com/ShokoAnime/Shokofin) by crowquillx. It may not be maintained or well-tested. Use the official plugin unless you want the fork's extra features: https://github.com/crowquillx/Shokofin",
+        "overview": "Manage your anime from Jellyfin using metadata from Shoko (personal fork)",
+        "owner": "crowquillx",
         "category": "Anime",
-        "imageUrl": "https://raw.githubusercontent.com/ShokoAnime/Shokofin/metadata/banner.png",
-        "versions": [
-            {
-                "version": "6.0.5.4012",
-                "changelog": "Only compatible with **12.y.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.40) for more info.\n\n---\n\n`fix`: **Better logging and delete existing files**:\n\nBetter logging and delete the existing files when moving `.trickplay` directories into the underlying library",
-                "targetAbi": "12.0.0.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.40/shoko_6.0.5.40_for_12.y.z.zip",
-                "checksum": "cca1020119b06e54a7da89da190dd20b",
-                "timestamp": "2026-10-11T00:17:21Z"
-            },
-            {
-                "version": "6.0.5.4011",
-                "changelog": "Only compatible with **10.11.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.40) for more info.\n\n---\n\n`fix`: **Better logging and delete existing files**:\n\nBetter logging and delete the existing files when moving `.trickplay` directories into the underlying library",
-                "targetAbi": "10.11.11.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.40/shoko_6.0.5.40_for_10.11.z.zip",
-                "checksum": "8876c704cbeea5f709291d37e30e456f",
-                "timestamp": "2026-10-11T00:17:29Z"
-            },
-            {
-                "version": "6.0.5.4010",
-                "changelog": "Only compatible with **10.10.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.40) for more info.\n\n---\n\n`fix`: **Better logging and delete existing files**:\n\nBetter logging and delete the existing files when moving `.trickplay` directories into the underlying library",
-                "targetAbi": "10.10.7.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.40/shoko_6.0.5.40_for_10.10.z.zip",
-                "checksum": "bd4c3ff3b35da710bd442d523f1b01a2",
-                "timestamp": "2026-10-11T00:17:36Z"
-            },
-            {
-                "version": "6.0.5.3912",
-                "changelog": "Only compatible with **12.y.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.39) for more info.\n\n---\n\n`fix`: **Hand ignored media folders back to jellyfin**:\n\n- Left ignored media folders out of the VFS, the file and refresh events, the library monitor and the ignore rule, so Jellyfin's own scanners and monitor handle them\n- Re-detected the mapping when a media folder is no longer ignored\n- Ignored a mapped media folder when a `.shoko-ignore` file is added to it later\n\n`misc`: **Correct the sync on import and live sync descriptions**:\n\n- Said that sync on import or refresh imports the watch-state for videos from Shoko\n- Said that live sync requires the events during playback setting\n\n`fix`: **Correct the auto-refresh metadata filters**:\n\n- Kept the anti-refresh dead zone unless it's longer than the out-of-sync range, instead of the other way around\n- Refreshed out-of-sync items when updating unaired items is enabled, and only for libraries the plugin is enabled for\n- Treated a refresh range of 0 days as no lower limit instead of selecting nothing\n\n`fix`: **Anchor specials to the last visible episode**:\n\n- Tracked the last normal episode itself when building the specials anchors, so hidden episodes no longer shift a special onto the wrong or a hidden episode\n\n`feat`: **Place specials using where shoko places them**:\n\n- Requested the specials placement with the Shoko episodes, which servers without it ignore\n- Placed specials using the first source that places them for the \"other data\" specials placement, and fell back to the air date for the rest with the mixed placement\n- Relabelled both specials placement options to say they use the specials placement in Shoko\n\n`fix`: **Use the playlist ordering and specials placement settings**:\n\n- Ordered the seasons within playlists by the playlist ordering setting, and the episodes within each season by their order\n- Placed specials within playlists by the playlist specials placement setting\n- Marked ordering by release date as the default playlist ordering, matching the actual default\n\n`fix`: **Use the first season's images for the specials season**:\n\n- Used the images of the show's first season for the \"Specials\" season, following the season image settings, instead of leaving it to fall back to the series images\n- Removed the series images offered for the \"Specials\" season when a client searches for its images\n\nCloses #117\n\n`fix`: **Hold back file events until the linked episodes and series exist**.",
-                "targetAbi": "12.0.0.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.39/shoko_6.0.5.39_for_12.y.z.zip",
-                "checksum": "989ffd040a40f4fc4fbee1bd2a5fa731",
-                "timestamp": "2026-10-06T21:51:24Z"
-            },
-            {
-                "version": "6.0.5.3911",
-                "changelog": "Only compatible with **10.11.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.39) for more info.\n\n---\n\n`fix`: **Hand ignored media folders back to jellyfin**:\n\n- Left ignored media folders out of the VFS, the file and refresh events, the library monitor and the ignore rule, so Jellyfin's own scanners and monitor handle them\n- Re-detected the mapping when a media folder is no longer ignored\n- Ignored a mapped media folder when a `.shoko-ignore` file is added to it later\n\n`misc`: **Correct the sync on import and live sync descriptions**:\n\n- Said that sync on import or refresh imports the watch-state for videos from Shoko\n- Said that live sync requires the events during playback setting\n\n`fix`: **Correct the auto-refresh metadata filters**:\n\n- Kept the anti-refresh dead zone unless it's longer than the out-of-sync range, instead of the other way around\n- Refreshed out-of-sync items when updating unaired items is enabled, and only for libraries the plugin is enabled for\n- Treated a refresh range of 0 days as no lower limit instead of selecting nothing\n\n`fix`: **Anchor specials to the last visible episode**:\n\n- Tracked the last normal episode itself when building the specials anchors, so hidden episodes no longer shift a special onto the wrong or a hidden episode\n\n`feat`: **Place specials using where shoko places them**:\n\n- Requested the specials placement with the Shoko episodes, which servers without it ignore\n- Placed specials using the first source that places them for the \"other data\" specials placement, and fell back to the air date for the rest with the mixed placement\n- Relabelled both specials placement options to say they use the specials placement in Shoko\n\n`fix`: **Use the playlist ordering and specials placement settings**:\n\n- Ordered the seasons within playlists by the playlist ordering setting, and the episodes within each season by their order\n- Placed specials within playlists by the playlist specials placement setting\n- Marked ordering by release date as the default playlist ordering, matching the actual default\n\n`fix`: **Use the first season's images for the specials season**:\n\n- Used the images of the show's first season for the \"Specials\" season, following the season image settings, instead of leaving it to fall back to the series images\n- Removed the series images offered for the \"Specials\" season when a client searches for its images\n\nCloses #117\n\n`fix`: **Hold back file events until the linked episodes and series exist**.",
-                "targetAbi": "10.11.11.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.39/shoko_6.0.5.39_for_10.11.z.zip",
-                "checksum": "38433a34134a012a242c214b4d03ae93",
-                "timestamp": "2026-10-06T21:51:34Z"
-            },
-            {
-                "version": "6.0.5.3910",
-                "changelog": "Only compatible with **10.10.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.39) for more info.\n\n---\n\n`fix`: **Hand ignored media folders back to jellyfin**:\n\n- Left ignored media folders out of the VFS, the file and refresh events, the library monitor and the ignore rule, so Jellyfin's own scanners and monitor handle them\n- Re-detected the mapping when a media folder is no longer ignored\n- Ignored a mapped media folder when a `.shoko-ignore` file is added to it later\n\n`misc`: **Correct the sync on import and live sync descriptions**:\n\n- Said that sync on import or refresh imports the watch-state for videos from Shoko\n- Said that live sync requires the events during playback setting\n\n`fix`: **Correct the auto-refresh metadata filters**:\n\n- Kept the anti-refresh dead zone unless it's longer than the out-of-sync range, instead of the other way around\n- Refreshed out-of-sync items when updating unaired items is enabled, and only for libraries the plugin is enabled for\n- Treated a refresh range of 0 days as no lower limit instead of selecting nothing\n\n`fix`: **Anchor specials to the last visible episode**:\n\n- Tracked the last normal episode itself when building the specials anchors, so hidden episodes no longer shift a special onto the wrong or a hidden episode\n\n`feat`: **Place specials using where shoko places them**:\n\n- Requested the specials placement with the Shoko episodes, which servers without it ignore\n- Placed specials using the first source that places them for the \"other data\" specials placement, and fell back to the air date for the rest with the mixed placement\n- Relabelled both specials placement options to say they use the specials placement in Shoko\n\n`fix`: **Use the playlist ordering and specials placement settings**:\n\n- Ordered the seasons within playlists by the playlist ordering setting, and the episodes within each season by their order\n- Placed specials within playlists by the playlist specials placement setting\n- Marked ordering by release date as the default playlist ordering, matching the actual default\n\n`fix`: **Use the first season's images for the specials season**:\n\n- Used the images of the show's first season for the \"Specials\" season, following the season image settings, instead of leaving it to fall back to the series images\n- Removed the series images offered for the \"Specials\" season when a client searches for its images\n\nCloses #117\n\n`fix`: **Hold back file events until the linked episodes and series exist**.",
-                "targetAbi": "10.10.7.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.39/shoko_6.0.5.39_for_10.10.z.zip",
-                "checksum": "d065be2e670fc2f2f7cbe1147406b2a1",
-                "timestamp": "2026-10-06T21:51:43Z"
-            },
-            {
-                "version": "6.0.5.3812",
-                "changelog": "Only compatible with **12.y.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.38) for more info.\n\n---\n\n`feat`: **Add a shoko similar items provider for jellyfin 12**:\n\n- Added a remote similar items provider for series and movies on Jellyfin 12, using the series suggestions in Shoko that point at series in the collection\n- Added a probe for the series suggestions endpoint, cached as `HasSuggestionsExposed`, and hid the provider when the server doesn't have it\n- Scored suggestions by their approval rating when the source has one, otherwise by their order",
-                "targetAbi": "12.0.0.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.38/shoko_6.0.5.38_for_12.y.z.zip",
-                "checksum": "bb1ca34dfe41b4c3b1db83a3e9cc9a52",
-                "timestamp": "2026-10-03T21:53:34Z"
-            },
-            {
-                "version": "6.0.5.3811",
-                "changelog": "Only compatible with **10.11.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.38) for more info.\n\n---\n\n`feat`: **Add a shoko similar items provider for jellyfin 12**:\n\n- Added a remote similar items provider for series and movies on Jellyfin 12, using the series suggestions in Shoko that point at series in the collection\n- Added a probe for the series suggestions endpoint, cached as `HasSuggestionsExposed`, and hid the provider when the server doesn't have it\n- Scored suggestions by their approval rating when the source has one, otherwise by their order",
-                "targetAbi": "10.11.11.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.38/shoko_6.0.5.38_for_10.11.z.zip",
-                "checksum": "1ed2e6fdc3b38f96912ca8e7618b6eab",
-                "timestamp": "2026-10-03T21:53:47Z"
-            },
-            {
-                "version": "6.0.5.3810",
-                "changelog": "Only compatible with **10.10.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.38) for more info.\n\n---\n\n`feat`: **Add a shoko similar items provider for jellyfin 12**:\n\n- Added a remote similar items provider for series and movies on Jellyfin 12, using the series suggestions in Shoko that point at series in the collection\n- Added a probe for the series suggestions endpoint, cached as `HasSuggestionsExposed`, and hid the provider when the server doesn't have it\n- Scored suggestions by their approval rating when the source has one, otherwise by their order",
-                "targetAbi": "10.10.7.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.38/shoko_6.0.5.38_for_10.10.z.zip",
-                "checksum": "6552ab7c0660b56277dd9816286c453b",
-                "timestamp": "2026-10-03T21:53:55Z"
-            },
-            {
-                "version": "6.0.5.3712",
-                "changelog": "Only compatible with **12.y.z**.\n\nSee the [release notes](https://github.com/ShokoAnime/Shokofin/releases/tag/v6.0.5-dev.37) for more info.\n\n---\n\n`fix`: **Stop creating duplicate playlists on every reconstruction**:\n\n- Embedded `[ShokoPlaylistGroup=<id>]` in the playlist folder name so existing playlists are found again; the display name is reset to the group title\n- Removed the cleanup step that deleted every Shoko playlist before each run\n- Removed legacy playlists identified only by the provider id, and extra playlists per group\n- Built playlists from the top-level group instead of whichever subgroup was looked up first\n- Replaced the playlist items in release order when anything was added, removed or moved\n- Fixed the mixed-content check for groups with series and movies in different subgroups",
-                "targetAbi": "12.0.0.0",
-                "sourceUrl": "https://github.com/ShokoAnime/Shokofin/releases/download/v6.0.5-dev.37/shoko_6.0.5.37_for_12.y.z.zip",
-                "checksum": "f1c45bd868e6e496a9f30e1c5aa7623e",
-                "timestamp": "2026-10-03T15:55:55Z"
-            }
-        ]
+        "imageUrl": "https://raw.githubusercontent.com/crowquillx/Shokofin/metadata/banner.png",
+        "versions": []
     }
 ]
