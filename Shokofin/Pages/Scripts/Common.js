@@ -520,6 +520,7 @@ export const LibraryMenu = globalThis.LibraryMenu;
  *   Title: AllTitlesConfiguration;
  *   MarkSpecialsWhenGrouped: boolean;
  *   AlwaysUseEpisodeTitleForTmdbMovies: boolean;
+ *   ShortenSeasonTitles: boolean;
  *   DescriptionConversionMode: DescriptionConversionMode;
  *   Description: AllDescriptionsConfiguration;
  *   TagSources: TagSource[];

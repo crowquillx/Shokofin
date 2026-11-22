@@ -270,12 +270,12 @@ public class CustomSeasonProvider(ILogger<CustomSeasonProvider> _logger, Virtual
         return season;
     }
 
-    public static Season? AddVirtualSeason(ILibraryManager libraryManager, ILogger logger, Info.SeasonInfo seasonInfo, int offset, int seasonNumber, Series series) {
+    public static Season? AddVirtualSeason(ILibraryManager libraryManager, ILogger logger, Info.SeasonInfo seasonInfo, int offset, int seasonNumber, Series series, Info.ShowInfo? showInfo = null) {
         if (SeasonExists(libraryManager, logger, series.GetPresentationUniqueKey(), series.Name, seasonNumber))
             return null;
 
         var seasonId = libraryManager.GetNewItemId(series.Id + "Season " + seasonNumber.ToString(System.Globalization.CultureInfo.InvariantCulture), typeof(Season));
-        var season = SeasonProvider.CreateMetadata(seasonInfo, seasonNumber, offset, series, seasonId);
+        var season = SeasonProvider.CreateMetadata(seasonInfo, seasonNumber, offset, series, seasonId, showInfo);
 
         logger.LogInformation("Adding virtual Season {SeasonNumber} to Series {SeriesName}. (Season={SeasonId},ExtraSeasons={ExtraIds})", seasonNumber, series.Name, seasonInfo.Id, seasonInfo.ExtraIds);
 

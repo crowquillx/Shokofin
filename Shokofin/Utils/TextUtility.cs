@@ -85,7 +85,7 @@ public static partial class TextUtility {
     private static readonly Regex SynopsisConvertNewLines = new(@"\r\n|\r", RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex SynopsisCleanMultiEmptyLines = new(@"\n{2,}", RegexOptions.Singleline | RegexOptions.Compiled);
 
-    [GeneratedRegex(@"^(?:Special|Episode|Volume|OVA|OAD|Web) \d+$|^Part \d+ of \d+$|^Episode [COPRST]\d+$|^(?:OVA|OAD|Movie|Complete Movie|Short Movie|TV Special|Music Video|Web|Volume)$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    [GeneratedRegex(@"^(?:Special|Episode|Volume|OVA|OAD|Web) \d+(?:\.\d+)?$|^Part \d+ of \d+$|^Episode [COPRST]\d+$|^(?:OVA|OAD|Movie|Complete Movie|Short Movie|TV Special|Music Video|Web|Volume)$|^\s*(?:TBA|TBD|To be announced)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex InvalidEpisodeTitleRegex();
 
     // Currently copied from these two locations until I have more time to research if there are even more patterns across languages to support;
@@ -469,7 +469,14 @@ public static partial class TextUtility {
     private static string? GetEpisodeTitleByType(EpisodeInfo episodeInfo, SeasonInfo seasonInfo, TitleConfiguration configuration, string? metadataLanguage) {
         var anidbTitles = new Lazy<IReadOnlyList<Title>>(() => episodeInfo.Titles.Where(t => t.Source is "AniDB").ToList());
         var tmdbTitles = new Lazy<IReadOnlyList<Title>>(() => episodeInfo.Titles.Where(t => t.Source is "TMDB").ToList());
+        // Fork: titles — a name Shoko made up is only used when no provider
+        // has a real title.
+        string? synthesizedTitle = null;
         foreach (var provider in configuration.GetOrderedTitleProviders()) {
+            if (provider is TitleProvider.Shoko_Default && episodeInfo.IsTitleSynthesized) {
+                synthesizedTitle ??= episodeInfo.Title;
+                continue;
+            }
             var title = provider switch {
                 TitleProvider.Shoko_Default =>
                     episodeInfo.Title,
@@ -491,6 +498,9 @@ public static partial class TextUtility {
                 return title.Trim();
         }
 
+        if (!string.IsNullOrWhiteSpace(synthesizedTitle) && !InvalidEpisodeTitleRegex().IsMatch(synthesizedTitle))
+            return synthesizedTitle.Trim();
+
         return null;
     }
 
@@ -498,7 +508,7 @@ public static partial class TextUtility {
 
     #region Titles | Season
 
-    public static (string? displayTitle, string? alternateTitle) GetSeasonTitles(SeasonInfo seasonInfo, int baseSeasonOffset, string? metadataLanguage) {
+    public static (string? displayTitle, string? alternateTitle) GetSeasonTitles(SeasonInfo seasonInfo, int baseSeasonOffset, string? metadataLanguage, ShowInfo? showInfo = null) {
         var config = seasonInfo.StructureType switch {
             SeriesStructureType.AniDB_Anime => Plugin.Instance.Configuration.Title.AnidbSeason.Enabled
                 ? Plugin.Instance.Configuration.Title.AnidbSeason
@@ -512,6 +522,8 @@ public static partial class TextUtility {
         };
         var displayTitle = GetSeriesTitleByType(seasonInfo, config.MainTitle, metadataLanguage);
         var alternateTitle = JoinTitles(config.AlternateTitles.Select(t => GetSeriesTitleByType(seasonInfo, t, metadataLanguage)), displayTitle, config.RemoveDuplicates);
+        if (Plugin.Instance.Configuration.ShortenSeasonTitles && showInfo is not null && !string.IsNullOrEmpty(displayTitle))
+            displayTitle = GetShortenedSeasonTitle(seasonInfo, displayTitle, config.MainTitle, metadataLanguage, showInfo);
         if (baseSeasonOffset > 0) {
             string type = string.Empty;
             switch (baseSeasonOffset) {
@@ -530,6 +542,38 @@ public static partial class TextUtility {
         }
 
         return (displayTitle, alternateTitle);
+    }
+
+    // Fork: titles
+    private static string GetShortenedSeasonTitle(SeasonInfo seasonInfo, string displayTitle, TitleConfiguration configuration, string? metadataLanguage, ShowInfo showInfo) {
+        if (seasonInfo.StructureType is SeriesStructureType.TMDB_SeriesAndMovies)
+            return displayTitle;
+
+        var seasonList = showInfo.SeasonOrderDictionary
+            .OrderBy(pair => pair.Key)
+            .Select(pair => pair.Value)
+            .DistinctBy(season => season.Id)
+            .ToList();
+        var index = seasonList.FindIndex(season => season.Id == seasonInfo.Id);
+        if (seasonList.Count < 2 || index < 0)
+            return displayTitle;
+
+        var showTitle = GetShowTitles(showInfo, metadataLanguage).displayTitle;
+        if (string.IsNullOrWhiteSpace(showTitle))
+            showTitle = showInfo.Title;
+        if (string.IsNullOrWhiteSpace(showTitle))
+            return displayTitle;
+
+        var seasons = seasonList
+            .Select(season => new SeasonTitleUtility.Season(
+                season.Id,
+                season.Id == seasonInfo.Id ? displayTitle : GetSeriesTitleByType(season, configuration, metadataLanguage) ?? season.Title,
+                season.Titles.FirstOrDefault(title => title.Source is "AniDB" && title.Type is TitleType.Main)?.Value,
+                season.PremiereDate
+            ))
+            .ToList();
+        var titles = SeasonTitleUtility.ShortenSeasonTitles(showTitle, showInfo.DefaultSeason.Id, seasons);
+        return titles[index] is { Length: > 0 } title ? title : displayTitle;
     }
 
     #endregion

@@ -235,6 +235,19 @@ public class PluginConfiguration : BasePluginConfiguration {
     /// </summary>
     public bool AlwaysUseEpisodeTitleForTmdbMovies { get; set; }
 
+    // Fork: titles
+
+    /// <summary>
+    /// Drop the show's title from the front of season titles in shows with
+    /// several seasons, e.g. "Demon Slayer: Entertainment District Arc"
+    /// becomes "Entertainment District Arc". Seasons keep their full name
+    /// when too little would be left, and every season keeps its full name
+    /// when fewer than half of them start with the show's title.
+    /// </summary>
+    public bool ShortenSeasonTitles { get; set; }
+
+    // Fork: titles (end)
+
     /// <summary>
     /// The new description configuration.
     /// </summary>

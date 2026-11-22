@@ -112,6 +112,15 @@ form:not(.advanced-mode) .advanced-only {
                             </label>
                             <div class="fieldDescription checkboxFieldDescription">When enabled, entries with a linked TheMovieDb movie use the episode title as-is instead of composing the title as &quot;Series: Episode&quot;. The title settings may need to be tweaked accordingly for this to function properly; you can configure the Shoko group &quot;Movie / Film&quot; title settings when advanced mode is enabled.</div>
                         </div>
+                        <!-- Fork: titles -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="ShortenSeasonTitles" />
+                                <span>Shorten Season Titles</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">In shows with several seasons, drops the show's title from the front of each season's title, so &quot;Demon Slayer: Entertainment District Arc&quot; becomes &quot;Entertainment District Arc&quot;. A season keeps its full title when only a year, a number or a few characters would be left, and every season keeps its full title when fewer than half of them start with the show's title. Seasons with the same title are told apart using their AniDB main title. Does not apply to the TheMovieDb structure. Refresh the library's metadata after changing this.</div>
+                        </div>
+                        <!-- Fork: titles (end) -->
                         <hr class="advanced-only" />
                         <div class="selectContainer selectContainer-withDescription advanced-only">
                             <label class="selectLabel" for="Title_ConfigureFor">Configure settings for</label>
