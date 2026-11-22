@@ -684,6 +684,11 @@ function applyFormToConfig(form, config) {
             config.VFS_AddReleaseGroup = form.querySelector("#VFS_AddReleaseGroup").checked;
             config.VFS_AddResolution = form.querySelector("#VFS_AddResolution").checked;
             config.VFS_UseSourceFileAsVersionIdentifier = form.querySelector("#VFS_UseSourceFileAsVersionIdentifier").checked;
+            // Fork: VFS
+            config.VFS_PreserveThemeSongs = form.querySelector("#VFS_PreserveThemeSongs").checked;
+            config.VFS_SyncThemeSongs = form.querySelector("#VFS_SyncThemeSongs").checked;
+            config.VFS_SkipCoveredVariations = form.querySelector("#VFS_SkipCoveredVariations").checked;
+            // End fork: VFS
 
             config.VFS_Threads = vfsTreads;
             form.querySelector("#VFS_Threads").value = vfsTreads;
@@ -958,6 +963,11 @@ async function applyConfigToForm(form, config) {
             form.querySelector("#VFS_AddReleaseGroup").checked = config.VFS_AddReleaseGroup;
             form.querySelector("#VFS_AddResolution").checked = config.VFS_AddResolution;
             form.querySelector("#VFS_UseSourceFileAsVersionIdentifier").checked = config.VFS_UseSourceFileAsVersionIdentifier;
+            // Fork: VFS
+            form.querySelector("#VFS_PreserveThemeSongs").checked = config.VFS_PreserveThemeSongs;
+            form.querySelector("#VFS_SyncThemeSongs").checked = config.VFS_SyncThemeSongs;
+            form.querySelector("#VFS_SkipCoveredVariations").checked = config.VFS_SkipCoveredVariations;
+            // End fork: VFS
 
             form.querySelector("#VFS_Threads").value = config.VFS_Threads;
             form.querySelector("#VFS_ResolveLinks").checked = config.VFS_ResolveLinks;

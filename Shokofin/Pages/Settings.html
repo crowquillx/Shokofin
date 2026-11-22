@@ -2223,6 +2223,29 @@ form:not(.advanced-mode) .advanced-only {
                             </label>
                             <div class="fieldDescription checkboxFieldDescription">Enabling this will add the standardized resolution (e.g. 480p, 1080p, 4K, etc.) to all files in the VFS if available. <strong>Warning</strong>: Though rare, we may fail to read the media info in Shoko when the files were first added (e.g. because of a corrupt file, encountering an unsupported <i>new</i> codec, etc.), then reading it later. This may lead to episode/movie entries to be "removed" and "added" as new entries the next time they are refreshed after the metadata has been added. <strong>Use at your own risk.</strong></div>
                         </div>
+                        <!-- Fork: VFS -->
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="VFS_PreserveThemeSongs" />
+                                <span>Keep Theme Songs Added to the VFS</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Keep theme songs that something other than the plugin puts in a VFS show or season folder, such as the <code>theme.mp3</code> a theme song plugin downloads, instead of removing them the next time the VFS is generated. Theme songs follow their show when its folder is renamed, and are removed with it when the show leaves the library.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="VFS_SyncThemeSongs" />
+                                <span>Share Theme Songs With Media Folders</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Link the theme songs in your media folders (<code>theme.mp3</code>, <code>theme2.mp3</code>, or audio in a <code>theme-music</code>, <code>theme-songs</code>, <code>themes</code>, <code>theme songs</code> or <code>theme music</code> folder) into the matching VFS show or season, and copy theme songs written into the VFS to the media folder so they survive a VFS rebuild. A media folder is only used when every file in it belongs to the same show or season, so shared download folders and media folder roots are left alone. Nothing in a media folder is ever overwritten or removed; a theme removed from the media folder is removed from the VFS once the media folder can be read again. Runs on full VFS generations, not iterative ones. <strong>Writes to your media folders.</strong></div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="VFS_SkipCoveredVariations" />
+                                <span>Leave Out Covered Variations</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Leave out files marked as a variation in Shoko for the episodes another file already covers, so only the main version is shown. A variation is kept when it is an episode's only file, such as the parts of an episode split across files.</div>
+                        </div>
+                        <!-- End fork: VFS -->
                         <button is="emby-button" type="submit" name="settings" class="raised button-submit block emby-button">
                             <span>${Save}</span>
                         </button>
